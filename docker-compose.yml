@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # Banco de Dados Central
+  db-postgres:
+    image: postgres:15-alpine
+    container_name: taskmgr-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: adminpassword
+      POSTGRES_DB: taskmgr_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - taskmgr-network
+
+  # [Futuro] API MVC
+  # api-mvc:
+  #   build:
+  #     context: ./src/TaskManager.MVC
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "5000:80"
+  #   ...
+
+  # [Futuro] API Clean Architecture
+  # api-clean:
+  #   build:
+  #     context: ./src/TaskManager.CleanArch
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "5001:80"
+  #   ...
+
+networks:
+  taskmgr-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

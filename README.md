@@ -1,20 +1,26 @@
-# Introduction 
-TODO: Give a short introduction of your project. Let this section explain the objectives or the motivation behind this project. 
+# TaskMgr-ArchPerf
 
-# Getting Started
-TODO: Guide users through getting your code up and running on their own system. In this section you can talk about:
-1.	Installation process
-2.	Software dependencies
-3.	Latest releases
-4.	API references
+Repositório central do Trabalho de Conclusão de Curso (TCC) focado na análise comparativa prática entre a **Clean Architecture** e o padrão **MVC**.
 
-# Build and Test
-TODO: Describe and show how to build your code and run the tests. 
+O projeto consiste no desenvolvimento de um sistema gerenciador de tarefas (Task Manager) com operações de CRUD e regras de negócio complexas. O objetivo é mensurar, através de automação em CI/CD e coleta de dados via Azure DevOps, a complexidade ciclomática, manutenibilidade e a fricção gerada pelo desenvolvimento assistido por Inteligência Artificial (IA) em diferentes padrões arquiteturais.
 
-# Contribute
-TODO: Explain how other users and developers can contribute to make your code better. 
+## Tecnologias Utilizadas
+* **Backend:** .NET 10 (C#)
+* **Frontend:** React (SPA)
+* **Banco de Dados:** PostgreSQL
+* **Infraestrutura:** Docker e Docker Compose
+* **Gestão e CI/CD:** Azure DevOps e Python (Radon)
 
-If you want to learn more about creating good readme files then refer the following [guidelines](https://docs.microsoft.com/en-us/azure/devops/repos/git/create-a-readme?view=azure-devops). You can also seek inspiration from the below readme files:
-- [ASP.NET Core](https://github.com/aspnet/Home)
-- [Visual Studio Code](https://github.com/Microsoft/vscode)
-- [Chakra Core](https://github.com/Microsoft/ChakraCore)
+## Estrutura do Repositório
+* `/docs`: Documentações adicionais e scripts analíticos.
+* `/infra`: Configurações de infraestrutura local e volumes.
+* `/src/TaskManager.MVC`: Protótipo da API construída com padrão MVC (Monolito).
+* `/src/TaskManager.CleanArch`: Protótipo da API dividida em camadas (Domain, Application, Infrastructure, WebAPI).
+
+## Como executar o projeto localmente
+
+### 1. Subindo a infraestrutura (Banco de Dados)
+Certifique-se de ter o [Docker](https://www.docker.com/) instalado. Na raiz do repositório, execute o comando abaixo para iniciar o container do banco na porta `5432`:
+
+```bash
+docker-compose up -d db-postgres
