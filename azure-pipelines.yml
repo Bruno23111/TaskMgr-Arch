@@ -1,0 +1,115 @@
+trigger:
+  branches:
+    include:
+      - develop
+      - main
+  paths:
+    include:
+      - src/**
+      - scripts/analyze_csharp_metrics.py
+      - azure-pipelines.yml
+
+pr:
+  branches:
+    include:
+      - develop
+      - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  buildConfiguration: Release
+  metricsDirectory: $(Build.SourcesDirectory)/artifacts/metrics
+  testResultsDirectory: $(Build.SourcesDirectory)/artifacts/test-results
+  publishDirectory: $(Build.ArtifactStagingDirectory)/publish
+
+stages:
+  - stage: ValidateAndMeasure
+    displayName: Validar e coletar métricas
+    jobs:
+      - job: BuildTestAndMetrics
+        displayName: Build, testes e métricas comparáveis
+        steps:
+          - task: UseDotNet@2
+            displayName: Instalar .NET SDK 10
+            inputs:
+              packageType: sdk
+              version: 10.0.x
+
+          - bash: |
+              set -euo pipefail
+              dotnet restore src/TaskManager.MVC/TaskManager.MVC.sln
+              dotnet restore src/TaskManager.CleanArch/TaskManager.CleanArch.sln
+              dotnet build src/TaskManager.MVC/TaskManager.MVC.sln --configuration $(buildConfiguration) --no-restore
+              dotnet build src/TaskManager.CleanArch/TaskManager.CleanArch.sln --configuration $(buildConfiguration) --no-restore
+            displayName: Restaurar e compilar as duas arquiteturas
+
+          - bash: |
+              set -euo pipefail
+              mkdir -p "$(testResultsDirectory)"
+              mapfile -t test_projects < <(find src -type f -name '*Tests.csproj' | sort)
+              if [ "${#test_projects[@]}" -eq 0 ]; then
+                echo "Ainda não há projetos de teste; cobertura será publicada quando forem adicionados."
+                exit 0
+              fi
+              for project in "${test_projects[@]}"; do
+                name="$(basename "$project" .csproj)"
+                dotnet test "$project" --configuration $(buildConfiguration) --no-restore \
+                  --logger "trx;LogFileName=${name}.trx" \
+                  --results-directory "$(testResultsDirectory)" \
+                  --collect "XPlat Code Coverage"
+              done
+            displayName: Executar testes e coletar cobertura
+
+          - task: PublishTestResults@2
+            displayName: Publicar resultados de testes
+            condition: always()
+            inputs:
+              testResultsFormat: VSTest
+              testResultsFiles: '**/*.trx'
+              searchFolder: $(testResultsDirectory)
+              failTaskOnFailedTests: true
+              failTaskOnMissingResultsFile: false
+
+          - bash: |
+              set -euo pipefail
+              python3 -m pip install --disable-pip-version-check lizard==1.17.10
+              python3 scripts/analyze_csharp_metrics.py \
+                --source MVC=src/TaskManager.MVC \
+                --source CLEAN_ARCH=src/TaskManager.CleanArch \
+                --output "$(metricsDirectory)" \
+                --repository "$(Build.SourcesDirectory)"
+              find "$(testResultsDirectory)" -name 'coverage.cobertura.xml' -print -quit | grep -q . && \
+                echo '##vso[task.setvariable variable=hasCoverage]true' || \
+                echo '##vso[task.setvariable variable=hasCoverage]false'
+            displayName: Gerar métricas C# e histórico Git
+
+          - task: PublishCodeCoverageResults@2
+            displayName: Publicar cobertura
+            condition: and(always(), eq(variables['hasCoverage'], 'true'))
+            inputs:
+              codeCoverageTool: Cobertura
+              summaryFileLocation: $(testResultsDirectory)/**/coverage.cobertura.xml
+
+          - bash: |
+              set -euo pipefail
+              dotnet publish src/TaskManager.MVC/TaskManager.MVC.API/TaskManager.MVC.API.csproj \
+                --configuration $(buildConfiguration) --no-restore --output "$(publishDirectory)/mvc"
+              dotnet publish src/TaskManager.CleanArch/TaskManager.CleanArch.WebAPI/TaskManager.CleanArch.WebAPI.csproj \
+                --configuration $(buildConfiguration) --no-restore --output "$(publishDirectory)/clean-architecture"
+            displayName: Publicar APIs para entrega contínua
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publicar artefato de métricas
+            condition: always()
+            inputs:
+              targetPath: $(metricsDirectory)
+              artifact: taskmgr-metrics
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publicar APIs compiladas
+            condition: succeeded()
+            inputs:
+              targetPath: $(publishDirectory)
+              artifact: taskmgr-apis
