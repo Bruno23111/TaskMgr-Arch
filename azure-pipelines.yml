@@ -19,10 +19,15 @@ pool:
   vmImage: ubuntu-latest
 
 variables:
-  buildConfiguration: Release
-  metricsDirectory: $(Build.SourcesDirectory)/artifacts/metrics
-  testResultsDirectory: $(Build.SourcesDirectory)/artifacts/test-results
-  publishDirectory: $(Build.ArtifactStagingDirectory)/publish
+  - group: taskmgr-github-mirror
+  - name: buildConfiguration
+    value: Release
+  - name: metricsDirectory
+    value: $(Build.SourcesDirectory)/artifacts/metrics
+  - name: testResultsDirectory
+    value: $(Build.SourcesDirectory)/artifacts/test-results
+  - name: publishDirectory
+    value: $(Build.ArtifactStagingDirectory)/publish
 
 stages:
   - stage: ValidateAndMeasure
@@ -113,3 +118,26 @@ stages:
             inputs:
               targetPath: $(publishDirectory)
               artifact: taskmgr-apis
+
+  - stage: MirrorToGitHub
+    displayName: Espelhar branch no GitHub
+    dependsOn: ValidateAndMeasure
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'), in(variables['Build.SourceBranch'], 'refs/heads/develop', 'refs/heads/main'))
+    jobs:
+      - job: PushBranch
+        displayName: Enviar develop ou main ao GitHub
+        steps:
+          - checkout: self
+
+          - bash: |
+              set -euo pipefail
+              credentials_file="$HOME/.git-credentials"
+              trap 'rm -f "$credentials_file"' EXIT
+
+              printf 'https://x-access-token:%s@github.com\n' "$GITHUB_TOKEN" > "$credentials_file"
+              git config --global credential.helper "store --file=$credentials_file"
+              git remote add github https://github.com/Bruno23111/TaskMgr-Arch.git
+              git push github "HEAD:refs/heads/$(Build.SourceBranchName)"
+            displayName: Sincronizar branch validada
+            env:
+              GITHUB_TOKEN: $(GITHUB_TOKEN)
