@@ -1,0 +1,184 @@
+openapi: 3.1.0
+info:
+  title: TaskMgr API
+  version: 1.0.0
+  description: Contrato comum obrigatório para as APIs MVC e Clean Architecture.
+servers:
+  - url: /
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      security: []
+      operationId: healthCheck
+      responses:
+        '200': { description: API e PostgreSQL disponíveis }
+        '503': { $ref: '#/components/responses/ErroInterno' }
+  /auth/login:
+    post:
+      security: []
+      operationId: login
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/LoginRequest' } } }
+      responses:
+        '200': { description: Sessão autenticada, content: { application/json: { schema: { $ref: '#/components/schemas/LoginResponse' } } } }
+        '400': { $ref: '#/components/responses/DadosInvalidos' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+  /projetos:
+    get:
+      operationId: listarProjetos
+      parameters: [ { $ref: '#/components/parameters/Pagina' }, { $ref: '#/components/parameters/Tamanho' } ]
+      responses: { '200': { description: Página de projetos, content: { application/json: { schema: { $ref: '#/components/schemas/PaginaProjeto' } } } } }
+    post:
+      operationId: criarProjeto
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProjetoRequest' } } } }
+      responses:
+        '201': { description: Projeto criado, headers: { Location: { schema: { type: string } } }, content: { application/json: { schema: { $ref: '#/components/schemas/Projeto' } } } }
+        '400': { $ref: '#/components/responses/DadosInvalidos' }
+        '403': { $ref: '#/components/responses/AcessoNegado' }
+  /projetos/{projetoId}:
+    parameters: [ { $ref: '#/components/parameters/ProjetoId' } ]
+    get:
+      operationId: obterProjeto
+      responses: { '200': { description: Projeto, content: { application/json: { schema: { $ref: '#/components/schemas/Projeto' } } } }, '404': { $ref: '#/components/responses/RecursoNaoEncontrado' } }
+    put:
+      operationId: atualizarProjeto
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProjetoUpdateRequest' } } } }
+      responses: { '200': { description: Projeto atualizado, content: { application/json: { schema: { $ref: '#/components/schemas/Projeto' } } } }, '400': { $ref: '#/components/responses/DadosInvalidos' }, '404': { $ref: '#/components/responses/RecursoNaoEncontrado' }, '409': { $ref: '#/components/responses/Conflito' } }
+    delete:
+      operationId: excluirProjeto
+      parameters: [ { $ref: '#/components/parameters/Versao' } ]
+      responses: { '204': { description: Projeto excluído logicamente }, '404': { $ref: '#/components/responses/RecursoNaoEncontrado' }, '409': { $ref: '#/components/responses/Conflito' } }
+  /tarefas:
+    get:
+      operationId: listarTarefas
+      parameters: [ { $ref: '#/components/parameters/Pagina' }, { $ref: '#/components/parameters/Tamanho' }, { name: projetoId, in: query, schema: { type: string, format: uuid } } ]
+      responses: { '200': { description: Página de tarefas, content: { application/json: { schema: { $ref: '#/components/schemas/PaginaTarefa' } } } } }
+    post:
+      operationId: criarTarefa
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/TarefaCreateRequest' } } } }
+      responses: { '201': { description: Tarefa criada, content: { application/json: { schema: { $ref: '#/components/schemas/Tarefa' } } } }, '400': { $ref: '#/components/responses/DadosInvalidos' }, '404': { $ref: '#/components/responses/RecursoNaoEncontrado' } }
+  /tarefas/{tarefaId}:
+    parameters: [ { $ref: '#/components/parameters/TarefaId' } ]
+    get:
+      operationId: obterTarefa
+      responses: { '200': { description: Tarefa, content: { application/json: { schema: { $ref: '#/components/schemas/Tarefa' } } } }, '404': { $ref: '#/components/responses/RecursoNaoEncontrado' } }
+    put:
+      operationId: atualizarTarefa
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/TarefaUpdateRequest' } } } }
+      responses: { '200': { description: Tarefa atualizada, content: { application/json: { schema: { $ref: '#/components/schemas/Tarefa' } } } }, '400': { $ref: '#/components/responses/DadosInvalidos' }, '403': { $ref: '#/components/responses/AcessoNegado' }, '404': { $ref: '#/components/responses/RecursoNaoEncontrado' }, '409': { $ref: '#/components/responses/Conflito' } }
+    delete:
+      operationId: excluirTarefa
+      parameters: [ { $ref: '#/components/parameters/Versao' } ]
+      responses: { '204': { description: Tarefa excluída logicamente }, '404': { $ref: '#/components/responses/RecursoNaoEncontrado' }, '409': { $ref: '#/components/responses/Conflito' } }
+  /tarefas/{tarefaId}/status:
+    patch:
+      operationId: alterarStatusTarefa
+      parameters: [ { $ref: '#/components/parameters/TarefaId' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AlterarStatusRequest' } } } }
+      responses: { '200': { description: Status alterado, content: { application/json: { schema: { $ref: '#/components/schemas/Tarefa' } } } }, '400': { $ref: '#/components/responses/DadosInvalidos' }, '403': { $ref: '#/components/responses/AcessoNegado' }, '404': { $ref: '#/components/responses/RecursoNaoEncontrado' }, '409': { $ref: '#/components/responses/Conflito' } }
+  /tarefas/{tarefaId}/responsavel:
+    put:
+      operationId: atribuirResponsavelTarefa
+      parameters: [ { $ref: '#/components/parameters/TarefaId' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AtribuirResponsavelRequest' } } } }
+      responses: { '200': { description: Responsável atribuído, content: { application/json: { schema: { $ref: '#/components/schemas/Tarefa' } } } }, '400': { $ref: '#/components/responses/DadosInvalidos' }, '409': { $ref: '#/components/responses/Conflito' } }
+    delete:
+      operationId: removerResponsavelTarefa
+      parameters: [ { $ref: '#/components/parameters/TarefaId' }, { $ref: '#/components/parameters/Versao' } ]
+      responses: { '200': { description: Responsável removido, content: { application/json: { schema: { $ref: '#/components/schemas/Tarefa' } } } }, '409': { $ref: '#/components/responses/Conflito' } }
+  /responsaveis:
+    get:
+      operationId: listarResponsaveis
+      responses: { '200': { description: Responsáveis, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Responsavel' } } } } }
+    post:
+      operationId: criarResponsavel
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ResponsavelCreateRequest' } } } }
+      responses: { '201': { description: Responsável e conta criados, content: { application/json: { schema: { $ref: '#/components/schemas/Responsavel' } } } }, '400': { $ref: '#/components/responses/DadosInvalidos' }, '409': { $ref: '#/components/responses/Conflito' } }
+  /responsaveis/{responsavelId}:
+    parameters: [ { name: responsavelId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    get:
+      operationId: obterResponsavel
+      responses: { '200': { description: Responsável, content: { application/json: { schema: { $ref: '#/components/schemas/Responsavel' } } } }, '404': { $ref: '#/components/responses/RecursoNaoEncontrado' } }
+    put:
+      operationId: atualizarResponsavel
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ResponsavelUpdateRequest' } } } }
+      responses: { '200': { description: Responsável atualizado, content: { application/json: { schema: { $ref: '#/components/schemas/Responsavel' } } } }, '400': { $ref: '#/components/responses/DadosInvalidos' }, '409': { $ref: '#/components/responses/Conflito' } }
+    delete:
+      operationId: excluirResponsavel
+      parameters: [ { $ref: '#/components/parameters/Versao' } ]
+      responses: { '204': { description: Responsável e conta excluídos }, '404': { $ref: '#/components/responses/RecursoNaoEncontrado' }, '409': { $ref: '#/components/responses/Conflito' } }
+  /responsaveis/{responsavelId}/desativacao:
+    patch:
+      operationId: desativarResponsavel
+      parameters: [ { name: responsavelId, in: path, required: true, schema: { type: string, format: uuid } } ]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [versao], properties: { versao: { type: integer, minimum: 1 } } } } } }
+      responses: { '200': { description: Responsável desativado, content: { application/json: { schema: { $ref: '#/components/schemas/Responsavel' } } } }, '409': { $ref: '#/components/responses/Conflito' } }
+  /status:
+    get:
+      operationId: listarStatus
+      responses: { '200': { description: Status, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Status' } } } } }
+    post:
+      operationId: criarStatus
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/StatusCreateRequest' } } } }
+      responses: { '201': { description: Status criado, content: { application/json: { schema: { $ref: '#/components/schemas/Status' } } } }, '400': { $ref: '#/components/responses/DadosInvalidos' }, '409': { $ref: '#/components/responses/Conflito' } }
+  /status/{statusId}:
+    parameters: [ { name: statusId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    get:
+      operationId: obterStatus
+      responses: { '200': { description: Status, content: { application/json: { schema: { $ref: '#/components/schemas/Status' } } } }, '404': { $ref: '#/components/responses/RecursoNaoEncontrado' } }
+    put:
+      operationId: atualizarStatus
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/StatusUpdateRequest' } } } }
+      responses: { '200': { description: Status atualizado, content: { application/json: { schema: { $ref: '#/components/schemas/Status' } } } }, '400': { $ref: '#/components/responses/DadosInvalidos' }, '409': { $ref: '#/components/responses/Conflito' } }
+    delete:
+      operationId: excluirStatus
+      parameters: [ { $ref: '#/components/parameters/Versao' } ]
+      responses: { '204': { description: Status excluído }, '404': { $ref: '#/components/responses/RecursoNaoEncontrado' }, '409': { $ref: '#/components/responses/Conflito' } }
+components:
+  securitySchemes: { bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT } }
+  parameters:
+    ProjetoId: { name: projetoId, in: path, required: true, schema: { type: string, format: uuid } }
+    TarefaId: { name: tarefaId, in: path, required: true, schema: { type: string, format: uuid } }
+    Versao: { name: versao, in: query, required: true, schema: { type: integer, minimum: 1 } }
+    Pagina: { name: pagina, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+    Tamanho: { name: tamanho, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+  responses:
+    DadosInvalidos: { description: Dados inválidos, content: { application/problem+json: { schema: { $ref: '#/components/schemas/ProblemDetails' } } } }
+    NaoAutenticado: { description: Não autenticado, content: { application/problem+json: { schema: { $ref: '#/components/schemas/ProblemDetails' } } } }
+    AcessoNegado: { description: Acesso negado, content: { application/problem+json: { schema: { $ref: '#/components/schemas/ProblemDetails' } } } }
+    RecursoNaoEncontrado: { description: Recurso não encontrado, content: { application/problem+json: { schema: { $ref: '#/components/schemas/ProblemDetails' } } } }
+    Conflito: { description: Conflito de regra de negócio ou concorrência, content: { application/problem+json: { schema: { $ref: '#/components/schemas/ProblemDetails' } } } }
+    ErroInterno: { description: Erro interno, content: { application/problem+json: { schema: { $ref: '#/components/schemas/ProblemDetails' } } } }
+  schemas:
+    LoginRequest: { type: object, required: [email, senha], properties: { email: { type: string, format: email }, senha: { type: string, format: password } } }
+    LoginResponse: { type: object, required: [accessToken, expiraEm], properties: { accessToken: { type: string }, expiraEm: { type: string, format: date-time } } }
+    ProjetoRequest: { type: object, required: [nome], properties: { nome: { type: string, maxLength: 100 }, descricao: { type: string, maxLength: 255 } } }
+    ProjetoUpdateRequest: { allOf: [ { $ref: '#/components/schemas/ProjetoRequest' }, { type: object, required: [versao], properties: { versao: { type: integer, minimum: 1 } } } ] }
+    Projeto: { allOf: [ { $ref: '#/components/schemas/ProjetoUpdateRequest' }, { type: object, required: [id], properties: { id: { type: string, format: uuid } } } ] }
+    TarefaCreateRequest: { type: object, required: [projetoId, titulo], properties: { projetoId: { type: string, format: uuid }, titulo: { type: string, maxLength: 100 }, descricao: { type: string, maxLength: 255 } } }
+    TarefaUpdateRequest: { type: object, required: [titulo, versao], properties: { titulo: { type: string, maxLength: 100 }, descricao: { type: string, maxLength: 255 }, versao: { type: integer, minimum: 1 } } }
+    AlterarStatusRequest: { type: object, required: [statusId, versao], properties: { statusId: { type: string, format: uuid }, versao: { type: integer, minimum: 1 } } }
+    AtribuirResponsavelRequest: { type: object, required: [responsavelId, versao], properties: { responsavelId: { type: string, format: uuid }, versao: { type: integer, minimum: 1 } } }
+    Tarefa: { allOf: [ { $ref: '#/components/schemas/TarefaUpdateRequest' }, { type: object, required: [id, projetoId, statusId], properties: { id: { type: string, format: uuid }, projetoId: { type: string, format: uuid }, statusId: { type: string, format: uuid }, responsavelId: { type: [string, 'null'], format: uuid }, concluidaEm: { type: [string, 'null'], format: date-time } } } ] }
+    ResponsavelCreateRequest: { type: object, required: [nome, email, senha, papel], properties: { nome: { type: string, maxLength: 100 }, email: { type: string, format: email }, senha: { type: string, format: password }, papel: { type: string, enum: [USUARIO, GESTOR] } } }
+    ResponsavelUpdateRequest: { type: object, required: [nome, versao], properties: { nome: { type: string, maxLength: 100 }, papel: { type: string, enum: [USUARIO, GESTOR] }, versao: { type: integer, minimum: 1 } } }
+    Responsavel: { type: object, required: [id, usuarioId, nome, email, ativo, papel], properties: { id: { type: string, format: uuid }, usuarioId: { type: string }, nome: { type: string }, email: { type: string, format: email }, ativo: { type: boolean }, papel: { type: string, enum: [USUARIO, GESTOR] } } }
+    StatusCreateRequest: { type: object, required: [codigo, nome, categoria], properties: { codigo: { type: string, maxLength: 20 }, nome: { type: string, maxLength: 60 }, categoria: { type: string, enum: [PENDENTE, EM_ANDAMENTO, CONCLUIDA] } } }
+    StatusUpdateRequest: { type: object, required: [nome, versao], properties: { nome: { type: string, maxLength: 60 }, versao: { type: integer, minimum: 1 } } }
+    Status: { allOf: [ { $ref: '#/components/schemas/StatusCreateRequest' }, { type: object, required: [id, protegido], properties: { id: { type: string, format: uuid }, protegido: { type: boolean } } } ] }
+    PaginaProjeto: { type: object, required: [itens, pagina, tamanho, total], properties: { itens: { type: array, items: { $ref: '#/components/schemas/Projeto' } }, pagina: { type: integer }, tamanho: { type: integer }, total: { type: integer } } }
+    PaginaTarefa: { type: object, required: [itens, pagina, tamanho, total], properties: { itens: { type: array, items: { $ref: '#/components/schemas/Tarefa' } }, pagina: { type: integer }, tamanho: { type: integer }, total: { type: integer } } }
+    ProblemDetails:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type: { type: string, format: uri-reference }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code: { type: string, enum: [DADOS_INVALIDOS, NAO_AUTENTICADO, ACESSO_NEGADO, RECURSO_NAO_ENCONTRADO, TRANSICAO_INVALIDA, RESPONSAVEL_OBRIGATORIO, PROJETO_COM_TAREFA_EM_ANDAMENTO, REGISTRO_EM_USO, TAREFA_CONCLUIDA, REGISTRO_PROTEGIDO, RESPONSAVEL_INATIVO, VALOR_DUPLICADO, CONCORRENCIA, ERRO_INTERNO] }
+        errors: { type: object, additionalProperties: { type: array, items: { type: string } } }
