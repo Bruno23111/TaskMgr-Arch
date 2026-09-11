@@ -11,7 +11,6 @@ import os
 import re
 import subprocess
 from importlib.metadata import version
-from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -53,6 +52,15 @@ def source_files(root: Path) -> list[Path]:
     )
 
 
+def source_scope(path: Path) -> str:
+    parts = (part.lower() for part in path.parts)
+    if any(part in {"test", "tests"} or part.endswith(".tests") for part in parts):
+        return "test"
+    if path.stem.lower().endswith("tests"):
+        return "test"
+    return "production"
+
+
 def source_without_comments_and_strings(text: str) -> str:
     without_strings = STRING_PATTERN.sub('"texto"', text)
     return COMMENT_PATTERN.sub(" ", without_strings)
@@ -86,17 +94,27 @@ def git_history(repository: Path, output: Path) -> None:
         "--pretty=format:%H%x1f%aI%x1f%an%x1f%s",
     ]
     result = subprocess.run(command, cwd=repository, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise RuntimeError(f"Falha ao coletar histórico Git: {result.stderr.strip()}")
     with output.open("w", newline="", encoding="utf-8") as stream:
         writer = csv.writer(stream)
         writer.writerow(["commit", "author_date", "author", "subject"])
-        if result.returncode == 0:
-            for line in result.stdout.splitlines():
-                writer.writerow(line.split("\x1f"))
+        for line in result.stdout.splitlines():
+            writer.writerow(line.split("\x1f"))
+
+
+def command_version(command: list[str]) -> str | None:
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=False)
+    except OSError:
+        return None
+    return result.stdout.strip() if result.returncode == 0 else None
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", action="append", type=parse_source, required=True)
+    parser.add_argument("--test-source", action="append", type=parse_source, default=[])
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--repository", type=Path, default=Path.cwd())
     arguments = parser.parse_args()
@@ -106,15 +124,23 @@ def main() -> int:
     file_rows: list[dict[str, object]] = []
     method_rows: list[dict[str, object]] = []
 
-    for architecture, root in arguments.source:
+    source_specs = [
+        (architecture, root, None) for architecture, root in arguments.source
+    ] + [
+        (architecture, root, "test") for architecture, root in arguments.test_source
+    ]
+
+    for architecture, root, forced_scope in source_specs:
         for path in source_files(root):
             text = path.read_text(encoding="utf-8-sig")
             analysis = lizard.analyze_file(str(path))
             nloc = physical_nloc(text)
             ccn = sum(function.cyclomatic_complexity for function in analysis.function_list)
             volume = halstead_volume(text)
+            scope = forced_scope or source_scope(path)
             file_rows.append({
                 "architecture": architecture,
+                "scope": scope,
                 "file": path.as_posix(),
                 "nloc": nloc,
                 "cyclomatic_complexity": ccn,
@@ -125,6 +151,7 @@ def main() -> int:
             for function in analysis.function_list:
                 method_rows.append({
                     "architecture": architecture,
+                    "scope": scope,
                     "file": path.as_posix(),
                     "method": function.long_name,
                     "start_line": function.start_line,
@@ -135,32 +162,40 @@ def main() -> int:
                     "token_count": function.token_count,
                 })
 
-    def write_csv(filename: str, rows: list[dict[str, object]]) -> None:
-        fields = list(rows[0]) if rows else []
+    file_fields = [
+        "architecture", "scope", "file", "nloc", "cyclomatic_complexity",
+        "function_count", "halstead_volume_approximation", "maintainability_index",
+    ]
+    method_fields = [
+        "architecture", "scope", "file", "method", "start_line", "end_line",
+        "nloc", "cyclomatic_complexity", "parameter_count", "token_count",
+    ]
+
+    def write_csv(filename: str, rows: list[dict[str, object]], fields: list[str]) -> None:
         with (output / filename).open("w", newline="", encoding="utf-8") as stream:
             writer = csv.DictWriter(stream, fieldnames=fields)
-            if fields:
-                writer.writeheader()
-                writer.writerows(rows)
+            writer.writeheader()
+            writer.writerows(rows)
 
-    write_csv("csharp-file-metrics.csv", file_rows)
-    write_csv("csharp-method-metrics.csv", method_rows)
+    production_file_rows = [row for row in file_rows if row["scope"] == "production"]
+    production_method_rows = [row for row in method_rows if row["scope"] == "production"]
+    test_file_rows = [row for row in file_rows if row["scope"] == "test"]
+    test_method_rows = [row for row in method_rows if row["scope"] == "test"]
+
+    write_csv("csharp-file-metrics.csv", production_file_rows, file_fields)
+    write_csv("csharp-method-metrics.csv", production_method_rows, method_fields)
+    write_csv("csharp-test-file-metrics.csv", test_file_rows, file_fields)
+    write_csv("csharp-test-method-metrics.csv", test_method_rows, method_fields)
     git_history(arguments.repository, output / "git-history.csv")
 
-    grouped: dict[str, list[dict[str, object]]] = {}
-    for row in file_rows:
-        grouped.setdefault(str(row["architecture"]), []).append(row)
-    summary = {
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "build_id": os.getenv("BUILD_BUILDID"),
-        "source_version": os.getenv("BUILD_SOURCEVERSION"),
-        "source_branch": os.getenv("BUILD_SOURCEBRANCH"),
-        "tool": {"name": "lizard", "version": version("lizard")},
-        "maintainability_index": {
-            "formula": "max(0, (171 - 5.2*ln(V) - 0.23*CC - 16.2*ln(LOC))*100/171)",
-            "halstead_volume": "Aproximação léxica documentada; não comparar com ferramentas que usem outra variante.",
-        },
-        "architectures": {
+    def group_by_architecture(rows: list[dict[str, object]]) -> dict[str, list[dict[str, object]]]:
+        grouped: dict[str, list[dict[str, object]]] = {}
+        for row in rows:
+            grouped.setdefault(str(row["architecture"]), []).append(row)
+        return grouped
+
+    def summarize(grouped: dict[str, list[dict[str, object]]]) -> dict[str, dict[str, object]]:
+        return {
             architecture: {
                 "file_count": len(rows),
                 "nloc": sum(int(row["nloc"]) for row in rows),
@@ -173,7 +208,28 @@ def main() -> int:
                 ),
             }
             for architecture, rows in grouped.items()
+        }
+
+    production_grouped = group_by_architecture(production_file_rows)
+    test_grouped = group_by_architecture(test_file_rows)
+    summary = {
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "build_id": os.getenv("BUILD_BUILDID"),
+        "source_version": os.getenv("BUILD_SOURCEVERSION"),
+        "source_branch": os.getenv("BUILD_SOURCEBRANCH"),
+        "environment": {
+            "agent_os": os.getenv("AGENT_OS"),
+            "agent_architecture": os.getenv("AGENT_OSARCHITECTURE"),
+            "image_os": os.getenv("IMAGEOS"),
+            "dotnet_sdk": command_version(["dotnet", "--version"]),
         },
+        "tool": {"name": "lizard", "version": version("lizard")},
+        "maintainability_index": {
+            "formula": "max(0, (171 - 5.2*ln(V) - 0.23*CC - 16.2*ln(LOC))*100/171)",
+            "halstead_volume": "Aproximação léxica documentada; não comparar com ferramentas que usem outra variante.",
+        },
+        "architectures": summarize(production_grouped),
+        "test_code": summarize(test_grouped),
     }
     (output / "metrics-summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
