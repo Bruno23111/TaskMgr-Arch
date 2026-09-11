@@ -8,7 +8,23 @@
 
 Na primeira inicialização do volume, o container cria os bancos isolados `taskmgr_mvc` e `taskmgr_cleanarch`. O arquivo `.env` é ignorado pelo Git.
 
-Se já existir um volume local criado com a configuração anterior, o script de inicialização não será executado automaticamente. Faça backup dos dados necessários e recrie o volume manualmente antes de usar os novos bancos.
+### Volume PostgreSQL já existente
+
+Os scripts em `docker-entrypoint-initdb.d` só são executados quando o volume PostgreSQL é criado. Portanto, se o container ou o volume já existia antes da inclusão dos bancos isolados, eles não serão criados automaticamente.
+
+Se o health check retornar `database "taskmgr_cleanarch" does not exist`, crie somente o banco que falta, sem apagar o volume:
+
+```powershell
+docker exec -it taskmgr-postgres psql -U taskmgr -d taskmgr -c "CREATE DATABASE taskmgr_cleanarch;"
+```
+
+Para conferir os bancos disponíveis:
+
+```powershell
+docker exec -it taskmgr-postgres psql -U taskmgr -d taskmgr -c "\l"
+```
+
+Caso seja necessário recriar o volume, faça antes um backup dos dados que deseja preservar.
 
 ## Connection strings das APIs
 
