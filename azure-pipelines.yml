@@ -6,20 +6,19 @@ trigger:
   paths:
     include:
       - src/**
-      - scripts/analyze_csharp_metrics.py
+      - tests/**
+      - docs/openapi/**
+      - docs/requisitos-funcionais.md
+      - scripts/**
+      - docker-compose.yml
+      - .env.example
+      - global.json
       - azure-pipelines.yml
 
-pr:
-  branches:
-    include:
-      - develop
-      - main
-
 pool:
-  vmImage: ubuntu-latest
+  vmImage: ubuntu-24.04
 
 variables:
-  - group: taskmgr-github-mirror
   - name: buildConfiguration
     value: Release
   - name: metricsDirectory
@@ -36,11 +35,16 @@ stages:
       - job: BuildTestAndMetrics
         displayName: Build, testes e métricas comparáveis
         steps:
+          - checkout: self
+            displayName: Obter código e histórico Git completo
+            fetchDepth: 0
+            fetchTags: false
+
           - task: UseDotNet@2
-            displayName: Instalar .NET SDK 10
+            displayName: Instalar .NET SDK 10.0.100
             inputs:
               packageType: sdk
-              version: 10.0.x
+              version: 10.0.100
 
           - bash: |
               set -euo pipefail
@@ -53,23 +57,31 @@ stages:
           - bash: |
               set -euo pipefail
               mkdir -p "$(testResultsDirectory)"
-              mapfile -t test_projects < <(find src -type f -name '*Tests.csproj' | sort)
+              search_roots=(src)
+              [ -d tests ] && search_roots+=(tests)
+              mapfile -t test_projects < <(find "${search_roots[@]}" -type f -name '*Tests.csproj' | sort)
               if [ "${#test_projects[@]}" -eq 0 ]; then
-                echo "Ainda não há projetos de teste; cobertura será publicada quando forem adicionados."
+                echo "##vso[task.logissue type=warning]Ainda não há projetos de teste. O quality gate completo será habilitado pela User Story #78."
+                echo '##vso[task.setvariable variable=hasCoverage]false'
                 exit 0
               fi
+              test_exit=0
               for project in "${test_projects[@]}"; do
                 name="$(basename "$project" .csproj)"
-                dotnet test "$project" --configuration $(buildConfiguration) --no-restore \
+                dotnet test "$project" --configuration $(buildConfiguration) \
                   --logger "trx;LogFileName=${name}.trx" \
                   --results-directory "$(testResultsDirectory)" \
-                  --collect "XPlat Code Coverage"
+                  --collect "XPlat Code Coverage" || test_exit=$?
               done
+              find "$(testResultsDirectory)" -name 'coverage.cobertura.xml' -print -quit | grep -q . && \
+                echo '##vso[task.setvariable variable=hasCoverage]true' || \
+                echo '##vso[task.setvariable variable=hasCoverage]false'
+              exit "$test_exit"
             displayName: Executar testes e coletar cobertura
 
           - task: PublishTestResults@2
             displayName: Publicar resultados de testes
-            condition: always()
+            condition: succeededOrFailed()
             inputs:
               testResultsFormat: VSTest
               testResultsFiles: '**/*.trx'
@@ -83,11 +95,11 @@ stages:
               python3 scripts/analyze_csharp_metrics.py \
                 --source MVC=src/TaskManager.MVC \
                 --source CLEAN_ARCH=src/TaskManager.CleanArch \
+                --test-source MVC=tests/TaskManager.MVC \
+                --test-source CLEAN_ARCH=tests/TaskManager.CleanArch \
                 --output "$(metricsDirectory)" \
                 --repository "$(Build.SourcesDirectory)"
-              find "$(testResultsDirectory)" -name 'coverage.cobertura.xml' -print -quit | grep -q . && \
-                echo '##vso[task.setvariable variable=hasCoverage]true' || \
-                echo '##vso[task.setvariable variable=hasCoverage]false'
+              echo '##vso[task.setvariable variable=hasMetrics]true'
             displayName: Gerar métricas C# e histórico Git
 
           - task: PublishCodeCoverageResults@2
@@ -107,7 +119,7 @@ stages:
 
           - task: PublishPipelineArtifact@1
             displayName: Publicar artefato de métricas
-            condition: always()
+            condition: and(succeeded(), eq(variables['hasMetrics'], 'true'))
             inputs:
               targetPath: $(metricsDirectory)
               artifact: taskmgr-metrics
@@ -123,6 +135,8 @@ stages:
     displayName: Espelhar branch no GitHub
     dependsOn: ValidateAndMeasure
     condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'), in(variables['Build.SourceBranch'], 'refs/heads/develop', 'refs/heads/main'))
+    variables:
+      - group: taskmgr-github-mirror
     jobs:
       - job: PushBranch
         displayName: Enviar develop ou main ao GitHub
