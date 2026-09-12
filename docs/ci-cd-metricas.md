@@ -13,6 +13,19 @@ O ambiente de coleta está fixado em Ubuntu 24.04 e .NET SDK 10.0.100. O arquivo
 
 Não há implantação automática nesta primeira versão: o repositório ainda não contém Dockerfiles das APIs nem ambiente de destino. A publicação das APIs compiladas é a etapa de entrega contínua; uma etapa de deploy será adicionada quando esses elementos existirem.
 
+## Evidências no Azure Blob Storage
+
+O estágio `PublishArtifactsToBlob` baixa os artifacts `taskmgr-metrics` e `taskmgr-apis` da execução atual e os envia ao container privado `pipeline-artifacts` da Storage Account `taskmgrartifacts2026`.
+
+O caminho segue a convenção abaixo, permitindo localizar uma evidência sem depender da retenção do Azure Pipelines:
+
+```text
+<branch>/build-<Build.BuildId>/metrics/...
+<branch>/build-<Build.BuildId>/apis/...
+```
+
+Cada blob recebe os metadados `buildid`, `branch` e `commit`. Pull Requests não executam esse estágio e não recebem acesso à Service Connection. A conexão `sc-taskmgr-arch-blob` usa Workload Identity Federation e possui somente o papel `Storage Blob Data Contributor` na Storage Account.
+
 ## Artefato `taskmgr-metrics`
 
 | Arquivo | Conteúdo |
