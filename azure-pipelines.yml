@@ -27,6 +27,10 @@ variables:
     value: $(Build.SourcesDirectory)/artifacts/test-results
   - name: publishDirectory
     value: $(Build.ArtifactStagingDirectory)/publish
+  - name: blobStorageAccountName
+    value: taskmgrartifacts2026
+  - name: blobContainerName
+    value: pipeline-artifacts
 
 stages:
   - stage: ValidateAndMeasure
@@ -130,6 +134,76 @@ stages:
             inputs:
               targetPath: $(publishDirectory)
               artifact: taskmgr-apis
+
+  - stage: PublishArtifactsToBlob
+    displayName: Armazenar artifacts no Azure Blob Storage
+    dependsOn: ValidateAndMeasure
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'), in(variables['Build.SourceBranch'], 'refs/heads/develop', 'refs/heads/main'))
+    jobs:
+      - job: UploadArtifacts
+        displayName: Baixar e enviar artifacts versionados
+        steps:
+          - task: DownloadPipelineArtifact@2
+            displayName: Baixar artifact de métricas da execução atual
+            inputs:
+              buildType: current
+              artifactName: taskmgr-metrics
+              targetPath: $(Pipeline.Workspace)/taskmgr-metrics
+
+          - task: DownloadPipelineArtifact@2
+            displayName: Baixar artifact das APIs da execução atual
+            inputs:
+              buildType: current
+              artifactName: taskmgr-apis
+              targetPath: $(Pipeline.Workspace)/taskmgr-apis
+
+          - task: AzureCLI@2
+            displayName: Enviar artifacts ao Blob Storage privado
+            inputs:
+              azureSubscription: sc-taskmgr-arch-blob
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+
+                storage_account="$(blobStorageAccountName)"
+                container="$(blobContainerName)"
+                base_path="$(Build.SourceBranchName)/build-$(Build.BuildId)"
+
+                az storage blob upload-batch \
+                  --account-name "$storage_account" \
+                  --auth-mode login \
+                  --destination "$container" \
+                  --destination-path "$base_path/metrics" \
+                  --source "$(Pipeline.Workspace)/taskmgr-metrics" \
+                  --overwrite false \
+                  --only-show-errors
+
+                az storage blob upload-batch \
+                  --account-name "$storage_account" \
+                  --auth-mode login \
+                  --destination "$container" \
+                  --destination-path "$base_path/apis" \
+                  --source "$(Pipeline.Workspace)/taskmgr-apis" \
+                  --overwrite false \
+                  --only-show-errors
+
+                while IFS= read -r blob_name; do
+                  az storage blob metadata update \
+                    --account-name "$storage_account" \
+                    --auth-mode login \
+                    --container-name "$container" \
+                    --name "$blob_name" \
+                    --metadata "buildid=$(Build.BuildId)" "branch=$(Build.SourceBranchName)" "commit=$(Build.SourceVersion)" \
+                    --only-show-errors
+                done < <(az storage blob list \
+                  --account-name "$storage_account" \
+                  --auth-mode login \
+                  --container-name "$container" \
+                  --prefix "$base_path/" \
+                  --query '[].name' \
+                  --output tsv \
+                  --only-show-errors)
 
   - stage: MirrorToGitHub
     displayName: Espelhar branch no GitHub
