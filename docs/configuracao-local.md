@@ -37,6 +37,19 @@ dotnet user-secrets set "ConnectionStrings:TaskManager" "Host=localhost;Port=543
 
 Em CI/CD e ambientes hospedados, configure `ConnectionStrings__TaskManager` como variável secreta do ambiente.
 
+## JWT da API Clean Architecture
+
+O emissor, a audiência e a chave de assinatura do JWT também são segredos de ambiente. Em desenvolvimento, defina-os com User Secrets:
+
+```powershell
+dotnet user-secrets set "Jwt:Emissor" "TaskMgr" --project src/TaskManager.CleanArch/TaskManager.CleanArch.WebAPI
+dotnet user-secrets set "Jwt:Audiencia" "TaskMgr.React" --project src/TaskManager.CleanArch/TaskManager.CleanArch.WebAPI
+dotnet user-secrets set "Jwt:ChaveSecreta" "<chave-local-com-no-minimo-32-caracteres>" --project src/TaskManager.CleanArch/TaskManager.CleanArch.WebAPI
+dotnet user-secrets set "Jwt:DuracaoEmMinutos" "30" --project src/TaskManager.CleanArch/TaskManager.CleanArch.WebAPI
+```
+
+Em CI/CD e ambientes hospedados, use as variáveis secretas `Jwt__Emissor`, `Jwt__Audiencia`, `Jwt__ChaveSecreta` e `Jwt__DuracaoEmMinutos`.
+
 ## Verificação
 
 Inicie cada API separadamente e acesse `GET /health`. A resposta `200` confirma que a API alcança o banco correspondente. As migrations serão criadas junto com as entidades de domínio.
