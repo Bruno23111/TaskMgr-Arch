@@ -1,0 +1,90 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using TaskManager.CleanArch.Application.Abstractions.Identity;
+using TaskManager.CleanArch.Application.Common;
+using TaskManager.CleanArch.Application.DTOs.Autenticacao;
+using TaskManager.CleanArch.Domain.Entities;
+using TaskManager.CleanArch.Infrastructure.Persistence;
+
+namespace TaskManager.CleanArch.Infrastructure.Identity;
+
+public sealed class ContaIdentityService(
+    UserManager<UsuarioIdentity> userManager,
+    TaskManagerCleanArchDbContext context) : IContaIdentityService
+{
+    public async Task<ContaAutenticada?> AutenticarAsync(string email, string senha, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(senha))
+            return null;
+
+        var usuario = await userManager.FindByEmailAsync(email.Trim());
+        if (usuario is null || !usuario.Ativo || !await userManager.CheckPasswordAsync(usuario, senha))
+            return null;
+
+        return await CriarContaAutenticadaAsync(usuario);
+    }
+
+    public async Task<ContaAutenticada?> ObterAtivaAsync(string usuarioId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(usuarioId))
+            return null;
+
+        var usuario = await userManager.FindByIdAsync(usuarioId);
+        return usuario is null || !usuario.Ativo
+            ? null
+            : await CriarContaAutenticadaAsync(usuario);
+    }
+
+    public async Task<ResponsavelContaDto> CriarResponsavelAsync(
+        CriarResponsavelConta dados,
+        CancellationToken cancellationToken = default)
+    {
+        ValidarDadosCadastro(dados);
+
+        await using var transacao = await context.Database.BeginTransactionAsync(cancellationToken);
+        var usuario = new UsuarioIdentity
+        {
+            UserName = dados.Email.Trim(),
+            Email = dados.Email.Trim(),
+            Ativo = true
+        };
+
+        var resultado = await userManager.CreateAsync(usuario, dados.Senha);
+        if (!resultado.Succeeded)
+            throw new InvalidOperationException(string.Join(" ", resultado.Errors.Select(erro => erro.Description)));
+
+        var papelAdicionado = await userManager.AddToRoleAsync(usuario, dados.Papel);
+        if (!papelAdicionado.Succeeded)
+            throw new InvalidOperationException(string.Join(" ", papelAdicionado.Errors.Select(erro => erro.Description)));
+
+        var responsavel = Responsavel.Criar(usuario.Id, dados.Nome);
+        context.Responsaveis.Add(responsavel);
+        await context.SaveChangesAsync(cancellationToken);
+        await transacao.CommitAsync(cancellationToken);
+
+        return new ResponsavelContaDto(
+            responsavel.Id,
+            usuario.Id,
+            responsavel.Nome,
+            usuario.Email!,
+            dados.Papel,
+            usuario.Ativo);
+    }
+
+    private async Task<ContaAutenticada> CriarContaAutenticadaAsync(UsuarioIdentity usuario)
+    {
+        var papeis = await userManager.GetRolesAsync(usuario);
+        return new ContaAutenticada(usuario.Id, usuario.Email!, papeis.ToArray());
+    }
+
+    private static void ValidarDadosCadastro(CriarResponsavelConta dados)
+    {
+        ArgumentNullException.ThrowIfNull(dados);
+
+        if (string.IsNullOrWhiteSpace(dados.Nome) || string.IsNullOrWhiteSpace(dados.Email) || string.IsNullOrWhiteSpace(dados.Senha))
+            throw new ArgumentException("Nome, e-mail e senha são obrigatórios.", nameof(dados));
+
+        if (!PapeisSistema.Valido(dados.Papel))
+            throw new ArgumentException("O papel deve ser Usuario ou Gestor.", nameof(dados));
+    }
+}

@@ -50,6 +50,18 @@ dotnet user-secrets set "Jwt:DuracaoEmMinutos" "30" --project src/TaskManager.Cl
 
 Em CI/CD e ambientes hospedados, use as variáveis secretas `Jwt__Emissor`, `Jwt__Audiencia`, `Jwt__ChaveSecreta` e `Jwt__DuracaoEmMinutos`.
 
+## Gestor inicial da API Clean Architecture
+
+Para criar o primeiro Gestor e seu perfil `Responsavel`, configure os três valores abaixo antes de iniciar a API. Eles são usados somente quando a conta ainda não existe:
+
+```powershell
+dotnet user-secrets set "GestorInicial:Nome" "<nome-do-gestor>" --project src/TaskManager.CleanArch/TaskManager.CleanArch.WebAPI
+dotnet user-secrets set "GestorInicial:Email" "<email-do-gestor>" --project src/TaskManager.CleanArch/TaskManager.CleanArch.WebAPI
+dotnet user-secrets set "GestorInicial:Senha" "<senha-segura>" --project src/TaskManager.CleanArch/TaskManager.CleanArch.WebAPI
+```
+
+Sem esses valores, a API apenas garante os papéis `Usuario` e `Gestor`; nenhuma conta padrão é criada.
+
 ## Verificação
 
 Inicie cada API separadamente e acesse `GET /health`. A resposta `200` confirma que a API alcança o banco correspondente. As migrations serão criadas junto com as entidades de domínio.
