@@ -1,3 +1,4 @@
+using TaskManager.CleanArch.Application.DependencyInjection;
 using TaskManager.CleanArch.WebAPI.Configuration;
 using TaskManager.CleanArch.Infrastructure.DependencyInjection;
 
@@ -8,7 +9,9 @@ builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddTaskManagerProblemDetails();
+builder.Services.AddTaskManagerApplication();
 builder.Services.AddTaskManagerInfrastructure(builder.Configuration);
+builder.Services.AddTaskManagerWebApi();
 
 var app = builder.Build();
 
