@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using TaskManager.CleanArch.Application.Abstractions.Services;
 using TaskManager.CleanArch.Application.Abstractions.Persistence;
 using TaskManager.CleanArch.Infrastructure.Identity;
 using TaskManager.CleanArch.Infrastructure.Persistence;
@@ -23,6 +24,7 @@ public static class InfrastructureServiceCollectionExtensions
 
         services.AddDbContext<TaskManagerCleanArchDbContext>(options => options.UseNpgsql(connectionString));
         services.AddTaskManagerIdentity();
+        services.AddTaskManagerJwt(configuration);
         services.AddScoped<IProjetoRepository, ProjetoRepository>();
         services.AddScoped<IResponsavelRepository, ResponsavelRepository>();
         services.AddScoped<IStatusRepository, StatusRepository>();
@@ -46,6 +48,16 @@ public static class InfrastructureServiceCollectionExtensions
             })
             .AddRoles<IdentityRole>()
             .AddEntityFrameworkStores<TaskManagerCleanArchDbContext>();
+
+        return services;
+    }
+
+    private static IServiceCollection AddTaskManagerJwt(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.NomeSecao));
+        services.AddScoped<ITokenService, JwtTokenService>();
 
         return services;
     }
