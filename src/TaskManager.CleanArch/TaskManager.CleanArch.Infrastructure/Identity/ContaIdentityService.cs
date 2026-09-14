@@ -50,6 +50,38 @@ public sealed class ContaIdentityService(
         CriarConsultaResponsaveisComPerfis(responsavelId)
             .SingleOrDefaultAsync(cancellationToken);
 
+    public async Task<ResponsavelContaDto?> AtualizarResponsavelAsync(
+        Guid responsavelId,
+        AtualizarResponsavelConta dados,
+        CancellationToken cancellationToken = default)
+    {
+        ValidarDadosAtualizacao(dados);
+
+        await using var transacao = await context.Database.BeginTransactionAsync(cancellationToken);
+        var responsavel = await context.Responsaveis
+            .SingleOrDefaultAsync(item => item.Id == responsavelId, cancellationToken);
+
+        if (responsavel is null)
+            return null;
+
+        var usuario = await userManager.FindByIdAsync(responsavel.UsuarioId);
+        if (usuario is null)
+            throw new InvalidOperationException("A conta do responsavel nao foi encontrada.");
+
+        responsavel.AtualizarNome(dados.Nome);
+        usuario.Email = dados.Email.Trim();
+        usuario.UserName = dados.Email.Trim();
+
+        var resultado = await userManager.UpdateAsync(usuario);
+        if (!resultado.Succeeded)
+            throw new InvalidOperationException(string.Join(" ", resultado.Errors.Select(erro => erro.Description)));
+
+        await context.SaveChangesAsync(cancellationToken);
+        await transacao.CommitAsync(cancellationToken);
+
+        return await CriarResponsavelContaDtoAsync(responsavel, usuario);
+    }
+
     public async Task<ResponsavelContaDto> CriarResponsavelAsync(
         CriarResponsavelConta dados,
         CancellationToken cancellationToken = default)
@@ -77,19 +109,29 @@ public sealed class ContaIdentityService(
         await context.SaveChangesAsync(cancellationToken);
         await transacao.CommitAsync(cancellationToken);
 
-        return new ResponsavelContaDto(
-            responsavel.Id,
-            usuario.Id,
-            responsavel.Nome,
-            usuario.Email!,
-            dados.Papel,
-            usuario.Ativo);
+        return await CriarResponsavelContaDtoAsync(responsavel, usuario, dados.Papel);
     }
 
     private async Task<ContaAutenticada> CriarContaAutenticadaAsync(UsuarioIdentity usuario)
     {
         var papeis = await userManager.GetRolesAsync(usuario);
         return new ContaAutenticada(usuario.Id, usuario.Email!, papeis.ToArray());
+    }
+
+    private async Task<ResponsavelContaDto> CriarResponsavelContaDtoAsync(
+        Responsavel responsavel,
+        UsuarioIdentity usuario,
+        string? papel = null)
+    {
+        var papelDaConta = papel ?? (await userManager.GetRolesAsync(usuario)).SingleOrDefault() ?? string.Empty;
+
+        return new ResponsavelContaDto(
+            responsavel.Id,
+            usuario.Id,
+            responsavel.Nome,
+            usuario.Email ?? string.Empty,
+            papelDaConta,
+            responsavel.Ativo && usuario.Ativo);
     }
 
     private IQueryable<ResponsavelContaDto> CriarConsultaResponsaveisComPerfis(Guid? responsavelId = null) =>
@@ -118,5 +160,13 @@ public sealed class ContaIdentityService(
 
         if (!PapeisSistema.Valido(dados.Papel))
             throw new ArgumentException("O papel deve ser Usuario ou Gestor.", nameof(dados));
+    }
+
+    private static void ValidarDadosAtualizacao(AtualizarResponsavelConta dados)
+    {
+        ArgumentNullException.ThrowIfNull(dados);
+
+        if (string.IsNullOrWhiteSpace(dados.Nome) || string.IsNullOrWhiteSpace(dados.Email))
+            throw new ArgumentException("Nome e e-mail sao obrigatorios.", nameof(dados));
     }
 }

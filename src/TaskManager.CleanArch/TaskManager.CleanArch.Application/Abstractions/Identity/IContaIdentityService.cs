@@ -12,6 +12,10 @@ public interface IContaIdentityService
     Task<ResponsavelContaDto?> ObterResponsavelComPerfilAsync(
         Guid responsavelId,
         CancellationToken cancellationToken = default);
+    Task<ResponsavelContaDto?> AtualizarResponsavelAsync(
+        Guid responsavelId,
+        AtualizarResponsavelConta dados,
+        CancellationToken cancellationToken = default);
     Task<ResponsavelContaDto> CriarResponsavelAsync(
         CriarResponsavelConta dados,
         CancellationToken cancellationToken = default);

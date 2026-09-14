@@ -30,6 +30,21 @@ public sealed class ResponsaveisController(ISender sender) : ControllerBase
         return responsavel is null ? NotFound() : Ok(responsavel);
     }
 
+    [HttpPut("{id:guid}")]
+    [ProducesResponseType<ResponsavelContaDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ResponsavelContaDto>> Atualizar(
+        Guid id,
+        AtualizarResponsavelRequest request,
+        CancellationToken cancellationToken)
+    {
+        var responsavel = await sender.Send(
+            new AtualizarResponsavelCommand(id, request.Nome, request.Email),
+            cancellationToken);
+
+        return responsavel is null ? NotFound() : Ok(responsavel);
+    }
+
     [HttpPost]
     [ProducesResponseType<ResponsavelContaDto>(StatusCodes.Status201Created)]
     public async Task<ActionResult<ResponsavelContaDto>> Criar(
