@@ -35,6 +35,21 @@ public sealed class ContaIdentityService(
             : await CriarContaAutenticadaAsync(usuario);
     }
 
+    public async Task<IReadOnlyList<ResponsavelContaDto>> ListarResponsaveisComPerfisAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var perfis = await CriarConsultaResponsaveisComPerfis()
+            .ToArrayAsync(cancellationToken);
+
+        return perfis;
+    }
+
+    public Task<ResponsavelContaDto?> ObterResponsavelComPerfilAsync(
+        Guid responsavelId,
+        CancellationToken cancellationToken = default) =>
+        CriarConsultaResponsaveisComPerfis(responsavelId)
+            .SingleOrDefaultAsync(cancellationToken);
+
     public async Task<ResponsavelContaDto> CriarResponsavelAsync(
         CriarResponsavelConta dados,
         CancellationToken cancellationToken = default)
@@ -76,6 +91,23 @@ public sealed class ContaIdentityService(
         var papeis = await userManager.GetRolesAsync(usuario);
         return new ContaAutenticada(usuario.Id, usuario.Email!, papeis.ToArray());
     }
+
+    private IQueryable<ResponsavelContaDto> CriarConsultaResponsaveisComPerfis(Guid? responsavelId = null) =>
+        from responsavel in context.Responsaveis.AsNoTracking()
+        join usuario in context.Users.AsNoTracking() on responsavel.UsuarioId equals usuario.Id
+        join usuarioPapel in context.UserRoles.AsNoTracking() on usuario.Id equals usuarioPapel.UserId into usuarioPapeis
+        from usuarioPapel in usuarioPapeis.DefaultIfEmpty()
+        join papel in context.Roles.AsNoTracking() on usuarioPapel.RoleId equals papel.Id into papeis
+        from papel in papeis.DefaultIfEmpty()
+        where !responsavelId.HasValue || responsavel.Id == responsavelId.Value
+        orderby responsavel.Nome
+        select new ResponsavelContaDto(
+            responsavel.Id,
+            usuario.Id,
+            responsavel.Nome,
+            usuario.Email ?? string.Empty,
+            papel.Name ?? string.Empty,
+            responsavel.Ativo && usuario.Ativo);
 
     private static void ValidarDadosCadastro(CriarResponsavelConta dados)
     {

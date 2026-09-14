@@ -7,6 +7,11 @@ public interface IContaIdentityService
 {
     Task<ContaAutenticada?> AutenticarAsync(string email, string senha, CancellationToken cancellationToken = default);
     Task<ContaAutenticada?> ObterAtivaAsync(string usuarioId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ResponsavelContaDto>> ListarResponsaveisComPerfisAsync(
+        CancellationToken cancellationToken = default);
+    Task<ResponsavelContaDto?> ObterResponsavelComPerfilAsync(
+        Guid responsavelId,
+        CancellationToken cancellationToken = default);
     Task<ResponsavelContaDto> CriarResponsavelAsync(
         CriarResponsavelConta dados,
         CancellationToken cancellationToken = default);
