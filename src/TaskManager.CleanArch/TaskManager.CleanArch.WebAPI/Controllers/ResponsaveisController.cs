@@ -39,7 +39,7 @@ public sealed class ResponsaveisController(ISender sender) : ControllerBase
         CancellationToken cancellationToken)
     {
         var responsavel = await sender.Send(
-            new AtualizarResponsavelCommand(id, request.Nome, request.Email),
+            new AtualizarResponsavelCommand(id, request.Nome, request.Email, request.Papel),
             cancellationToken);
 
         return responsavel is null ? NotFound() : Ok(responsavel);
