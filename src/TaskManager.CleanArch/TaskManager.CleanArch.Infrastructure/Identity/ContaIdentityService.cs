@@ -76,10 +76,22 @@ public sealed class ContaIdentityService(
         if (!resultado.Succeeded)
             throw new InvalidOperationException(string.Join(" ", resultado.Errors.Select(erro => erro.Description)));
 
+        var papeisAtuais = await userManager.GetRolesAsync(usuario);
+        if (papeisAtuais.Count > 0)
+        {
+            resultado = await userManager.RemoveFromRolesAsync(usuario, papeisAtuais);
+            if (!resultado.Succeeded)
+                throw new InvalidOperationException(string.Join(" ", resultado.Errors.Select(erro => erro.Description)));
+        }
+
+        resultado = await userManager.AddToRoleAsync(usuario, dados.Papel);
+        if (!resultado.Succeeded)
+            throw new InvalidOperationException(string.Join(" ", resultado.Errors.Select(erro => erro.Description)));
+
         await context.SaveChangesAsync(cancellationToken);
         await transacao.CommitAsync(cancellationToken);
 
-        return await CriarResponsavelContaDtoAsync(responsavel, usuario);
+        return await CriarResponsavelContaDtoAsync(responsavel, usuario, dados.Papel);
     }
 
     public async Task<ResponsavelContaDto> CriarResponsavelAsync(
@@ -166,7 +178,10 @@ public sealed class ContaIdentityService(
     {
         ArgumentNullException.ThrowIfNull(dados);
 
-        if (string.IsNullOrWhiteSpace(dados.Nome) || string.IsNullOrWhiteSpace(dados.Email))
-            throw new ArgumentException("Nome e e-mail sao obrigatorios.", nameof(dados));
+        if (string.IsNullOrWhiteSpace(dados.Nome) || string.IsNullOrWhiteSpace(dados.Email) || string.IsNullOrWhiteSpace(dados.Papel))
+            throw new ArgumentException("Nome, e-mail e papel sao obrigatorios.", nameof(dados));
+
+        if (!PapeisSistema.Valido(dados.Papel))
+            throw new ArgumentException("O papel deve ser Usuario ou Gestor.", nameof(dados));
     }
 }

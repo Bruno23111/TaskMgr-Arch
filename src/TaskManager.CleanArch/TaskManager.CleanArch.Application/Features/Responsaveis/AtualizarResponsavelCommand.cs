@@ -8,7 +8,8 @@ namespace TaskManager.CleanArch.Application.Features.Responsaveis;
 public sealed record AtualizarResponsavelCommand(
     Guid Id,
     string Nome,
-    string Email) : IRequest<ResponsavelContaDto?>;
+    string Email,
+    string Papel) : IRequest<ResponsavelContaDto?>;
 
 public sealed class AtualizarResponsavelCommandHandler(
     IContaIdentityService contas,
@@ -22,7 +23,7 @@ public sealed class AtualizarResponsavelCommandHandler(
 
         return contas.AtualizarResponsavelAsync(
             request.Id,
-            new AtualizarResponsavelConta(request.Nome, request.Email),
+            new AtualizarResponsavelConta(request.Nome, request.Email, request.Papel),
             cancellationToken);
     }
 }
