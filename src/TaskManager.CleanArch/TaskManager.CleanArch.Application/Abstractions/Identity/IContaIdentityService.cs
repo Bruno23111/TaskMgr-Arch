@@ -20,6 +20,11 @@ public interface IContaIdentityService
         int versao,
         string usuarioExecutorId,
         CancellationToken cancellationToken = default);
+    Task<bool?> ExcluirResponsavelAsync(
+        Guid responsavelId,
+        int versao,
+        string usuarioExecutorId,
+        CancellationToken cancellationToken = default);
     Task<ResponsavelContaDto> CriarResponsavelAsync(
         CriarResponsavelConta dados,
         CancellationToken cancellationToken = default);
