@@ -18,7 +18,7 @@ public sealed class ExcluirProjetoCommandHandler(IProjetoRepository projetos, IT
             var projeto = await projetos.ObterPorIdAsync(request.ProjetoId, token) ?? throw new RecursoNaoEncontradoException("Projeto");
             projeto.Versao.ExigirVersao(request.Versao);
             if (await projetos.PossuiTarefaEmAndamentoAsync(projeto.Id, token))
-                throw new TaskManager.CleanArch.Application.Common.ApplicationException("PROJETO_COM_TAREFA_EM_ANDAMENTO", "Não é possível excluir projeto com tarefa em andamento.");
+                throw new ProjetoComTarefaEmAndamentoException();
             var agora = relogio.DataHoraAgoraUTC;
             foreach (var tarefa in await tarefas.ListarVisiveisPorProjetoAsync(projeto.Id, token)) tarefa.ExcluirComProjeto(agora);
             projeto.Excluir(agora);
