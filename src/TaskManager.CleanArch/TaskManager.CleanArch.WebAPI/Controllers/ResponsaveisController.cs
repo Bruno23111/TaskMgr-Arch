@@ -22,25 +22,27 @@ public sealed class ResponsaveisController(ISender sender) : ControllerBase
         return Ok(responsaveis);
     }
 
-    [HttpGet("{id:guid}")]
+    [HttpGet("{responsavelId:guid}")]
     [ProducesResponseType<ResponsavelContaDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<ResponsavelContaDto>> ObterPorId(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<ResponsavelContaDto>> ObterPorId(Guid responsavelId, CancellationToken cancellationToken)
     {
-        var responsavel = await sender.Send(new ObterResponsavelPorIdQuery(id), cancellationToken);
+        var responsavel = await sender.Send(new ObterResponsavelPorIdQuery(responsavelId), cancellationToken);
         return responsavel is null ? NotFound() : Ok(responsavel);
     }
 
-    [HttpPut("{id:guid}")]
+    [HttpPut("{responsavelId:guid}")]
     [ProducesResponseType<ResponsavelContaDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<ResponsavelContaDto>> Atualizar(
-        Guid id,
+        Guid responsavelId,
         AtualizarResponsavelRequest request,
         CancellationToken cancellationToken)
     {
         var responsavel = await sender.Send(
-            new AtualizarResponsavelCommand(id, request.Nome, request.Email, request.Papel),
+            new AtualizarResponsavelCommand(responsavelId, request.Nome, request.Email, request.Papel),
             cancellationToken);
 
         return responsavel is null ? NotFound() : Ok(responsavel);
@@ -74,6 +76,8 @@ public sealed class ResponsaveisController(ISender sender) : ControllerBase
 
     [HttpPost]
     [ProducesResponseType<ResponsavelContaDto>(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<ResponsavelContaDto>> Criar(
         CriarResponsavelRequest request,
         CancellationToken cancellationToken)
