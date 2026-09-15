@@ -1,4 +1,5 @@
 using MediatR;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TaskManager.CleanArch.Application.Common;
@@ -56,6 +57,19 @@ public sealed class ResponsaveisController(ISender sender) : ControllerBase
     {
         var responsavel = await sender.Send(new DesativarResponsavelCommand(responsavelId, request.Versao), cancellationToken);
         return responsavel is null ? NotFound() : Ok(responsavel);
+    }
+
+    [HttpDelete("{responsavelId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Excluir(
+        Guid responsavelId,
+        [FromQuery, Range(1, int.MaxValue)] int versao,
+        CancellationToken cancellationToken)
+    {
+        var excluido = await sender.Send(new ExcluirResponsavelCommand(responsavelId, versao), cancellationToken);
+        return excluido is null ? NotFound() : NoContent();
     }
 
     [HttpPost]

@@ -173,8 +173,57 @@ public sealed class ContaIdentityService(
 
         await context.SaveChangesAsync(cancellationToken);
         await transacao.CommitAsync(cancellationToken);
-
         return await CriarResponsavelContaDtoAsync(responsavel, usuario);
+    }
+
+    public async Task<bool?> ExcluirResponsavelAsync(
+        Guid responsavelId,
+        int versao,
+        string usuarioExecutorId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var transacao = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var responsavel = await context.Responsaveis
+            .SingleOrDefaultAsync(item => item.Id == responsavelId, cancellationToken);
+
+        if (responsavel is null)
+            return null;
+
+        if (versao < 1 || responsavel.Versao != versao)
+            throw new ConflitoDeConcorrenciaException();
+
+        if (responsavel.UsuarioId == usuarioExecutorId)
+            throw new DomainRuleViolationException("REGISTRO_PROTEGIDO", "O gestor não pode excluir a própria conta.");
+
+        var usuario = await userManager.FindByIdAsync(responsavel.UsuarioId)
+            ?? throw new InvalidOperationException("A conta do responsavel nao foi encontrada.");
+
+        if (await userManager.IsInRoleAsync(usuario, PapeisSistema.Gestor))
+        {
+            var gestoresAtivos = await (
+                from conta in context.Users
+                join usuarioPapel in context.UserRoles on conta.Id equals usuarioPapel.UserId
+                join papel in context.Roles on usuarioPapel.RoleId equals papel.Id
+                where conta.Ativo && papel.Name == PapeisSistema.Gestor
+                select conta.Id).CountAsync(cancellationToken);
+
+            if (gestoresAtivos <= 1)
+                throw new DomainRuleViolationException("REGISTRO_PROTEGIDO", "O último gestor ativo não pode ser excluído.");
+        }
+
+        var possuiReferencias = await context.Tarefas.AnyAsync(
+            tarefa => tarefa.ResponsavelId == responsavelId,
+            cancellationToken);
+        responsavel.GarantirPodeSerExcluido(possuiReferencias);
+
+        context.Responsaveis.Remove(responsavel);
+        var resultado = await userManager.DeleteAsync(usuario);
+        if (!resultado.Succeeded)
+            throw new InvalidOperationException(string.Join(" ", resultado.Errors.Select(erro => erro.Description)));
+
+        await context.SaveChangesAsync(cancellationToken);
+        await transacao.CommitAsync(cancellationToken);
+        return true;
     }
 
     private async Task<ContaAutenticada> CriarContaAutenticadaAsync(UsuarioIdentity usuario)
