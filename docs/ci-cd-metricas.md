@@ -2,11 +2,11 @@
 
 O pipeline definido em `azure-pipelines.yml` é a referência única de integração contínua para as duas implementações. O gatilho CI executa após alterações nas branches `develop` e `main` que afetem código, contrato OpenAPI, requisitos funcionais, scripts, infraestrutura ou a configuração do pipeline. Em Azure Repos, a validação de pull requests é acionada pelas branch policies de `develop` e `main`.
 
-O ambiente de coleta está fixado em Ubuntu 24.04 e .NET SDK 10.0.100. O arquivo `global.json` impede seleção silenciosa de outro SDK, e o checkout com `fetchDepth: 0` disponibiliza o histórico alcançável completo para a coleta Git.
+O ambiente de coleta está fixado em Ubuntu 24.04 e .NET SDK 10.0.401. O arquivo `global.json` impede seleção silenciosa de outro SDK, e o checkout com `fetchDepth: 0` disponibiliza o histórico alcançável completo para a coleta Git.
 
 ## O que o pipeline executa
 
-1. Obtém o código com histórico Git completo, instala o SDK .NET 10.0.100 e compila as soluções MVC e Clean Architecture em modo `Release`.
+1. Obtém o código com histórico Git completo, instala o SDK .NET 10.0.401 e compila as soluções MVC e Clean Architecture em modo `Release`.
 2. Procura projetos `*Tests.csproj` em `src/` e `tests/`. Quando existirem, restaura e executa todos os testes, publica TRX e cobertura Cobertura e bloqueia o pipeline se algum teste falhar. Enquanto a User Story #78 não adicionar os projetos, a etapa emite um aviso explícito e não inventa cobertura.
 3. Instala Lizard 1.17.10 e executa `scripts/analyze_csharp_metrics.py` nas duas árvores de código C#.
 4. Publica os artefatos `taskmgr-metrics` e `taskmgr-apis` no Azure Pipelines.
@@ -60,7 +60,7 @@ Radon não é utilizado para análise do backend: ele é um analisador de códig
 ## Como reproduzir a coleta
 
 1. Use um commit em `develop` ou `main` no qual MVC e Clean Architecture implementem o mesmo conjunto de requisitos.
-2. Confirme no log o agente Ubuntu 24.04, o SDK 10.0.100 e a versão 1.17.10 do Lizard.
+2. Confirme no log o agente Ubuntu 24.04, o SDK 10.0.401 e a versão 1.17.10 do Lizard.
 3. Confirme que build e testes aplicáveis foram aprovados.
 4. Baixe `taskmgr-metrics` e registre o ID do build e o commit presentes em `metrics-summary.json`.
 5. Preserve os CSVs brutos junto com a análise do TCC; não combine resultados produzidos com versões diferentes do ambiente.

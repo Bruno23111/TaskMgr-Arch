@@ -2,7 +2,6 @@ using TaskManager.CleanArch.Application.DTOs.Autenticacao;
 
 namespace TaskManager.CleanArch.Application.Abstractions.Identity;
 
-// Abstrai ASP.NET Core Identity para que a Application não dependa de UserManager ou EF Core.
 public interface IContaIdentityService
 {
     Task<ContaAutenticada?> AutenticarAsync(string email, string senha, CancellationToken cancellationToken = default);
@@ -15,6 +14,11 @@ public interface IContaIdentityService
     Task<ResponsavelContaDto?> AtualizarResponsavelAsync(
         Guid responsavelId,
         AtualizarResponsavelConta dados,
+        CancellationToken cancellationToken = default);
+    Task<ResponsavelContaDto?> DesativarResponsavelAsync(
+        Guid responsavelId,
+        int versao,
+        string usuarioExecutorId,
         CancellationToken cancellationToken = default);
     Task<ResponsavelContaDto> CriarResponsavelAsync(
         CriarResponsavelConta dados,
