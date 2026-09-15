@@ -59,7 +59,7 @@ public sealed class ContaIdentityService(
     {
         ValidarDadosAtualizacao(dados);
 
-        await using var transacao = await context.Database.BeginTransactionAsync(cancellationToken);
+        await using var transacao = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var responsavel = await context.Responsaveis
             .SingleOrDefaultAsync(item => item.Id == responsavelId, cancellationToken);
 
@@ -70,6 +70,23 @@ public sealed class ContaIdentityService(
         if (usuario is null)
             throw new InvalidOperationException("A conta do responsavel nao foi encontrada.");
 
+        var papeisAtuais = await userManager.GetRolesAsync(usuario);
+        var rebaixaUltimoGestor = usuario.Ativo
+            && papeisAtuais.Contains(PapeisSistema.Gestor)
+            && dados.Papel != PapeisSistema.Gestor;
+        if (rebaixaUltimoGestor)
+        {
+            var gestoresAtivos = await (
+                from conta in context.Users
+                join usuarioPapel in context.UserRoles on conta.Id equals usuarioPapel.UserId
+                join papel in context.Roles on usuarioPapel.RoleId equals papel.Id
+                where conta.Ativo && papel.Name == PapeisSistema.Gestor
+                select conta.Id).CountAsync(cancellationToken);
+
+            if (gestoresAtivos <= 1)
+                throw new DomainRuleViolationException("REGISTRO_PROTEGIDO", "O último gestor ativo não pode ser rebaixado.");
+        }
+
         responsavel.AtualizarNome(dados.Nome);
         usuario.Email = dados.Email.Trim();
         usuario.UserName = dados.Email.Trim();
@@ -78,7 +95,6 @@ public sealed class ContaIdentityService(
         if (!resultado.Succeeded)
             throw new InvalidOperationException(string.Join(" ", resultado.Errors.Select(erro => erro.Description)));
 
-        var papeisAtuais = await userManager.GetRolesAsync(usuario);
         if (papeisAtuais.Count > 0)
         {
             resultado = await userManager.RemoveFromRolesAsync(usuario, papeisAtuais);
