@@ -112,6 +112,13 @@ public sealed class Tarefa : AggregateRoot
         Versao++;
     }
 
+    public void ExcluirComProjeto(DateTimeOffset agoraUtc)
+    {
+        GarantirAtiva();
+        ExcluidoEm = Projeto.GarantirUtc(agoraUtc);
+        Versao++;
+    }
+
     private void AtualizarConteudo(string titulo, string? descricao, bool incrementaVersao)
     {
         Projeto.GarantirTexto(titulo, nameof(titulo), 100);
