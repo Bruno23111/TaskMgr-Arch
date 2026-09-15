@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 using TaskManager.CleanArch.Application.Abstractions.Identity;
 using TaskManager.CleanArch.Application.Common;
 using TaskManager.CleanArch.Application.DTOs.Autenticacao;
+using TaskManager.CleanArch.Domain.Common;
 using TaskManager.CleanArch.Domain.Entities;
 using TaskManager.CleanArch.Infrastructure.Persistence;
 
@@ -110,6 +112,57 @@ public sealed class ContaIdentityService(
         await transacao.CommitAsync(cancellationToken);
 
         return await CriarResponsavelContaDtoAsync(responsavel, usuario, dados.Papel);
+    }
+
+    public async Task<ResponsavelContaDto?> DesativarResponsavelAsync(
+        Guid responsavelId,
+        int versao,
+        string usuarioExecutorId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var transacao = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var responsavel = await context.Responsaveis
+            .SingleOrDefaultAsync(item => item.Id == responsavelId, cancellationToken);
+
+        if (responsavel is null)
+            return null;
+
+        if (versao < 1 || responsavel.Versao != versao)
+            throw new ConflitoDeConcorrenciaException();
+
+        if (responsavel.UsuarioId == usuarioExecutorId)
+            throw new DomainRuleViolationException("REGISTRO_PROTEGIDO", "O gestor não pode desativar a própria conta.");
+
+        var usuario = await userManager.FindByIdAsync(responsavel.UsuarioId)
+            ?? throw new InvalidOperationException("A conta do responsavel nao foi encontrada.");
+
+        if (await userManager.IsInRoleAsync(usuario, PapeisSistema.Gestor))
+        {
+            var gestoresAtivos = await (
+                from conta in context.Users
+                join usuarioPapel in context.UserRoles on conta.Id equals usuarioPapel.UserId
+                join papel in context.Roles on usuarioPapel.RoleId equals papel.Id
+                where conta.Ativo && papel.Name == PapeisSistema.Gestor
+                select conta.Id).CountAsync(cancellationToken);
+
+            if (gestoresAtivos <= 1)
+                throw new DomainRuleViolationException("REGISTRO_PROTEGIDO", "O último gestor ativo não pode ser desativado.");
+        }
+
+        var possuiTarefaVisivelNaoConcluida = await context.Tarefas.AnyAsync(
+            tarefa => tarefa.ResponsavelId == responsavelId && tarefa.ExcluidoEm == null && tarefa.ConcluidaEm == null,
+            cancellationToken);
+        responsavel.Desativar(possuiTarefaVisivelNaoConcluida);
+
+        usuario.Ativo = false;
+        var resultado = await userManager.UpdateAsync(usuario);
+        if (!resultado.Succeeded)
+            throw new InvalidOperationException(string.Join(" ", resultado.Errors.Select(erro => erro.Description)));
+
+        await context.SaveChangesAsync(cancellationToken);
+        await transacao.CommitAsync(cancellationToken);
+
+        return await CriarResponsavelContaDtoAsync(responsavel, usuario);
     }
 
     private async Task<ContaAutenticada> CriarContaAutenticadaAsync(UsuarioIdentity usuario)

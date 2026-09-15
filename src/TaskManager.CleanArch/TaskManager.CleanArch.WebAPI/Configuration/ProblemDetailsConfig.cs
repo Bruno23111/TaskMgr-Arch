@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using TaskManager.CleanArch.Application.Common;
+using TaskManager.CleanArch.Domain.Common;
 
 namespace TaskManager.CleanArch.WebAPI.Configuration;
 
@@ -6,6 +8,7 @@ public static class ProblemDetailsConfig
 {
     public static IServiceCollection AddTaskManagerProblemDetails(this IServiceCollection services)
     {
+        services.AddExceptionHandler<TaskManagerExceptionHandler>();
         services.AddProblemDetails(options =>
         {
             options.CustomizeProblemDetails = context =>

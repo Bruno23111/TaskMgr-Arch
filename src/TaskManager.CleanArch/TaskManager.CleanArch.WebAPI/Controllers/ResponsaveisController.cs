@@ -45,6 +45,19 @@ public sealed class ResponsaveisController(ISender sender) : ControllerBase
         return responsavel is null ? NotFound() : Ok(responsavel);
     }
 
+    [HttpPatch("{responsavelId:guid}/desativacao")]
+    [ProducesResponseType<ResponsavelContaDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<ResponsavelContaDto>> Desativar(
+        Guid responsavelId,
+        DesativarResponsavelRequest request,
+        CancellationToken cancellationToken)
+    {
+        var responsavel = await sender.Send(new DesativarResponsavelCommand(responsavelId, request.Versao), cancellationToken);
+        return responsavel is null ? NotFound() : Ok(responsavel);
+    }
+
     [HttpPost]
     [ProducesResponseType<ResponsavelContaDto>(StatusCodes.Status201Created)]
     public async Task<ActionResult<ResponsavelContaDto>> Criar(

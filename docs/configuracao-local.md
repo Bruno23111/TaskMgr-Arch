@@ -37,6 +37,28 @@ dotnet user-secrets set "ConnectionStrings:TaskManager" "Host=localhost;Port=543
 
 Em CI/CD e ambientes hospedados, configure `ConnectionStrings__TaskManager` como variável secreta do ambiente.
 
+## Migrations da API Clean Architecture
+
+Os comandos do Entity Framework usam a factory de design da camada Infrastructure. Antes de executa-los, informe a conexao local por `TASKMANAGER_CONNECTION_STRING` (use a mesma senha definida no `.env`):
+
+```powershell
+$env:TASKMANAGER_CONNECTION_STRING = "Host=localhost;Port=5432;Database=taskmgr_cleanarch;Username=taskmgr;Password=<sua-senha>"
+```
+
+Para criar uma migration apos uma alteracao no modelo:
+
+```powershell
+dotnet ef migrations add <NomeDaMigration> --project src/TaskManager.CleanArch/TaskManager.CleanArch.Infrastructure --startup-project src/TaskManager.CleanArch/TaskManager.CleanArch.WebAPI --context TaskManagerCleanArchDbContext --output-dir Persistence/Migrations
+```
+
+Para aplicar as migrations pendentes ao banco local:
+
+```powershell
+dotnet ef database update --project src/TaskManager.CleanArch/TaskManager.CleanArch.Infrastructure --startup-project src/TaskManager.CleanArch/TaskManager.CleanArch.WebAPI --context TaskManagerCleanArchDbContext
+```
+
+Crie migrations somente quando houver mudanca no modelo persistido e revise os arquivos gerados antes de versiona-los.
+
 ## JWT da API Clean Architecture
 
 O emissor, a audiência e a chave de assinatura do JWT também são segredos de ambiente. Em desenvolvimento, defina-os com User Secrets:
