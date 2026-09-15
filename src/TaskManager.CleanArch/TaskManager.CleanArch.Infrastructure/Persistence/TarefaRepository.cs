@@ -10,6 +10,9 @@ public sealed class TarefaRepository(TaskManagerCleanArchDbContext context) : IT
     public Task<Tarefa?> ObterPorIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         context.Tarefas.SingleOrDefaultAsync(tarefa => tarefa.Id == id, cancellationToken);
 
+    public async Task<IReadOnlyList<Tarefa>> ListarVisiveisPorProjetoAsync(Guid projetoId, CancellationToken cancellationToken = default) =>
+        await context.Tarefas.Where(tarefa => tarefa.ProjetoId == projetoId).ToArrayAsync(cancellationToken);
+
     public async Task<ResultadoPaginado<Tarefa>> ListarAsync(Guid? projetoId, RequisicaoPaginada paginacao, CancellationToken cancellationToken = default)
     {
         paginacao.Validar();

@@ -33,4 +33,22 @@ public sealed class ProjetosController(ISender sender) : ControllerBase
         var projeto = await sender.Send(new CriarProjetoCommand(request.Nome, request.Descricao), cancellationToken);
         return Created($"/projetos/{projeto.Id}", projeto);
     }
+
+    [HttpGet("{projetoId:guid}")]
+    [ProducesResponseType<ProjetoDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<ProjetoDto>> Obter(Guid projetoId, CancellationToken cancellationToken)
+        => Ok(await sender.Send(new ObterProjetoQuery(projetoId), cancellationToken));
+
+    [HttpPut("{projetoId:guid}")]
+    [ProducesResponseType<ProjetoDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<ProjetoDto>> Atualizar(Guid projetoId, AtualizarProjetoRequest request, CancellationToken cancellationToken)
+        => Ok(await sender.Send(new AtualizarProjetoCommand(projetoId, request.Nome, request.Descricao, request.Versao), cancellationToken));
+
+    [HttpDelete("{projetoId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> Excluir(Guid projetoId, [FromQuery] int versao, CancellationToken cancellationToken)
+    {
+        await sender.Send(new ExcluirProjetoCommand(projetoId, versao), cancellationToken);
+        return NoContent();
+    }
 }
