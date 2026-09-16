@@ -12,6 +12,9 @@ public sealed class ResponsavelRepository(TaskManagerCleanArchDbContext context)
     public Task<Responsavel?> ObterPorUsuarioIdAsync(string usuarioId, CancellationToken cancellationToken = default) =>
         context.Responsaveis.SingleOrDefaultAsync(responsavel => responsavel.UsuarioId == usuarioId, cancellationToken);
 
+    public async Task<IReadOnlyList<Responsavel>> ListarAsync(CancellationToken cancellationToken = default) =>
+        await context.Responsaveis.AsNoTracking().OrderBy(responsavel => responsavel.Nome).ToArrayAsync(cancellationToken);
+
     public void Adicionar(Responsavel responsavel) => context.Responsaveis.Add(responsavel);
     public void Remover(Responsavel responsavel) => context.Responsaveis.Remove(responsavel);
 }

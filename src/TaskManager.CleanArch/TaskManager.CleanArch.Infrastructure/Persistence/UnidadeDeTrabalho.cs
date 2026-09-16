@@ -2,6 +2,7 @@ using TaskManager.CleanArch.Application.Abstractions.Persistence;
 using TaskManager.CleanArch.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using System.Data;
 
 namespace TaskManager.CleanArch.Infrastructure.Persistence;
 
@@ -21,11 +22,28 @@ public sealed class UnidadeDeTrabalho(TaskManagerCleanArchDbContext context) : I
         {
             throw new ValorDuplicadoException("Já existe um registro com esse valor único.");
         }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.SerializationFailure })
+        {
+            throw new ConflitoDeConcorrenciaException();
+        }
     }
 
     public async Task<T> ExecutarEmTransacaoAsync<T>(Func<CancellationToken, Task<T>> operacao, CancellationToken cancellationToken = default)
     {
-        await using var transacao = await context.Database.BeginTransactionAsync(cancellationToken);
+        return await ExecutarEmTransacaoAsync(operacao, IsolationLevel.ReadCommitted, cancellationToken);
+    }
+
+    public async Task<T> ExecutarEmTransacaoSerializavelAsync<T>(Func<CancellationToken, Task<T>> operacao, CancellationToken cancellationToken = default)
+    {
+        return await ExecutarEmTransacaoAsync(operacao, IsolationLevel.Serializable, cancellationToken);
+    }
+
+    private async Task<T> ExecutarEmTransacaoAsync<T>(
+        Func<CancellationToken, Task<T>> operacao,
+        IsolationLevel isolamento,
+        CancellationToken cancellationToken)
+    {
+        await using var transacao = await context.Database.BeginTransactionAsync(isolamento, cancellationToken);
         try
         {
             var resultado = await operacao(cancellationToken);

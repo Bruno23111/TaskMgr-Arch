@@ -6,26 +6,11 @@ public interface IContaIdentityService
 {
     Task<ContaAutenticada?> AutenticarAsync(string email, string senha, CancellationToken cancellationToken = default);
     Task<ContaAutenticada?> ObterAtivaAsync(string usuarioId, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<ResponsavelContaDto>> ListarResponsaveisComPerfisAsync(
-        CancellationToken cancellationToken = default);
-    Task<ResponsavelContaDto?> ObterResponsavelComPerfilAsync(
-        Guid responsavelId,
-        CancellationToken cancellationToken = default);
-    Task<ResponsavelContaDto?> AtualizarResponsavelAsync(
-        Guid responsavelId,
-        AtualizarResponsavelConta dados,
-        CancellationToken cancellationToken = default);
-    Task<ResponsavelContaDto?> DesativarResponsavelAsync(
-        Guid responsavelId,
-        int versao,
-        string usuarioExecutorId,
-        CancellationToken cancellationToken = default);
-    Task<bool?> ExcluirResponsavelAsync(
-        Guid responsavelId,
-        int versao,
-        string usuarioExecutorId,
-        CancellationToken cancellationToken = default);
-    Task<ResponsavelContaDto> CriarResponsavelAsync(
-        CriarResponsavelConta dados,
-        CancellationToken cancellationToken = default);
+    Task<ContaIdentityDto?> ObterContaAsync(string usuarioId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyDictionary<string, ContaIdentityDto>> ObterContasAsync(IEnumerable<string> usuarioIds, CancellationToken cancellationToken = default);
+    Task<ContaIdentityDto> CriarContaAsync(CriarContaIdentity dados, CancellationToken cancellationToken = default);
+    Task AtualizarContaAsync(string usuarioId, string email, string papel, CancellationToken cancellationToken = default);
+    Task DesativarContaAsync(string usuarioId, CancellationToken cancellationToken = default);
+    Task ExcluirContaAsync(string usuarioId, CancellationToken cancellationToken = default);
+    Task<int> ContarGestoresAtivosAsync(CancellationToken cancellationToken = default);
 }

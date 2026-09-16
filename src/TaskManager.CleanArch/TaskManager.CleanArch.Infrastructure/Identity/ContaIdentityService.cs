@@ -1,12 +1,8 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
-using System.Data;
 using TaskManager.CleanArch.Application.Abstractions.Identity;
 using TaskManager.CleanArch.Application.Common;
 using TaskManager.CleanArch.Application.DTOs.Autenticacao;
-using TaskManager.CleanArch.Domain.Common;
-using TaskManager.CleanArch.Domain.Entities;
 using TaskManager.CleanArch.Infrastructure.Persistence;
 
 namespace TaskManager.CleanArch.Infrastructure.Identity;
@@ -15,236 +11,150 @@ public sealed class ContaIdentityService(
     UserManager<UsuarioIdentity> userManager,
     TaskManagerCleanArchDbContext context) : IContaIdentityService
 {
-    public async Task<ContaAutenticada?> AutenticarAsync(string email, string senha, CancellationToken cancellationToken = default)
+    public async Task<ContaAutenticada?> AutenticarAsync(
+        string email,
+        string senha,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(senha))
+        {
             return null;
+        }
 
         var usuario = await userManager.FindByEmailAsync(email.Trim());
         if (usuario is null || !usuario.Ativo || !await userManager.CheckPasswordAsync(usuario, senha))
+        {
             return null;
+        }
 
         return await CriarContaAutenticadaAsync(usuario);
     }
 
-    public async Task<ContaAutenticada?> ObterAtivaAsync(string usuarioId, CancellationToken cancellationToken = default)
+    public async Task<ContaAutenticada?> ObterAtivaAsync(
+        string usuarioId,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(usuarioId))
+        {
             return null;
+        }
 
         var usuario = await userManager.FindByIdAsync(usuarioId);
-        return usuario is null || !usuario.Ativo
-            ? null
-            : await CriarContaAutenticadaAsync(usuario);
+        return usuario is null || !usuario.Ativo ? null : await CriarContaAutenticadaAsync(usuario);
     }
 
-    public async Task<IReadOnlyList<ResponsavelContaDto>> ListarResponsaveisComPerfisAsync(
+    public async Task<ContaIdentityDto?> ObterContaAsync(
+        string usuarioId,
         CancellationToken cancellationToken = default)
     {
-        var perfis = await CriarConsultaResponsaveisComPerfis()
+        var usuario = await userManager.FindByIdAsync(usuarioId);
+        return usuario is null ? null : await CriarContaDtoAsync(usuario);
+    }
+
+    public async Task<IReadOnlyDictionary<string, ContaIdentityDto>> ObterContasAsync(
+        IEnumerable<string> usuarioIds,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = usuarioIds.Distinct().ToArray();
+        if (ids.Length == 0)
+        {
+            return new Dictionary<string, ContaIdentityDto>();
+        }
+
+        var usuarios = await context.Users
+            .AsNoTracking()
+            .Where(usuario => ids.Contains(usuario.Id))
             .ToArrayAsync(cancellationToken);
 
-        return perfis;
-    }
-
-    public Task<ResponsavelContaDto?> ObterResponsavelComPerfilAsync(
-        Guid responsavelId,
-        CancellationToken cancellationToken = default) =>
-        CriarConsultaResponsaveisComPerfis(responsavelId)
-            .SingleOrDefaultAsync(cancellationToken);
-
-    public async Task<ResponsavelContaDto?> AtualizarResponsavelAsync(
-        Guid responsavelId,
-        AtualizarResponsavelConta dados,
-        CancellationToken cancellationToken = default)
-    {
-        ValidarDadosAtualizacao(dados);
-
-        await using var transacao = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-        var responsavel = await context.Responsaveis
-            .SingleOrDefaultAsync(item => item.Id == responsavelId, cancellationToken);
-
-        if (responsavel is null)
-            return null;
-
-        if (dados.Versao < 1 || responsavel.Versao != dados.Versao)
-            throw new ConflitoDeConcorrenciaException();
-
-        var usuario = await userManager.FindByIdAsync(responsavel.UsuarioId);
-        if (usuario is null)
-            throw new InvalidOperationException("A conta do responsavel nao foi encontrada.");
-
-        var papeisAtuais = await userManager.GetRolesAsync(usuario);
-        var rebaixaUltimoGestor = usuario.Ativo
-            && papeisAtuais.Contains(PapeisSistema.Gestor)
-            && dados.Papel != PapeisSistema.Gestor;
-        if (rebaixaUltimoGestor)
+        var contas = new Dictionary<string, ContaIdentityDto>(usuarios.Length);
+        foreach (var usuario in usuarios)
         {
-            var gestoresAtivos = await (
-                from conta in context.Users
-                join usuarioPapel in context.UserRoles on conta.Id equals usuarioPapel.UserId
-                join papel in context.Roles on usuarioPapel.RoleId equals papel.Id
-                where conta.Ativo && papel.Name == PapeisSistema.Gestor
-                select conta.Id).CountAsync(cancellationToken);
-
-            if (gestoresAtivos <= 1)
-                throw new DomainRuleViolationException("REGISTRO_PROTEGIDO", "O último gestor ativo não pode ser rebaixado.");
+            contas[usuario.Id] = await CriarContaDtoAsync(usuario);
         }
 
-        responsavel.AtualizarNome(dados.Nome);
-        usuario.Email = dados.Email.Trim();
-        usuario.UserName = dados.Email.Trim();
-
-        var resultado = await userManager.UpdateAsync(usuario);
-        if (!resultado.Succeeded)
-            LancarFalhaIdentity(resultado);
-
-        if (papeisAtuais.Count > 0)
-        {
-            resultado = await userManager.RemoveFromRolesAsync(usuario, papeisAtuais);
-            if (!resultado.Succeeded)
-                throw new InvalidOperationException(string.Join(" ", resultado.Errors.Select(erro => erro.Description)));
-        }
-
-        resultado = await userManager.AddToRoleAsync(usuario, dados.Papel);
-        if (!resultado.Succeeded)
-            throw new InvalidOperationException(string.Join(" ", resultado.Errors.Select(erro => erro.Description)));
-
-        await SalvarAlteracoesAsync(cancellationToken);
-        await transacao.CommitAsync(cancellationToken);
-
-        return await CriarResponsavelContaDtoAsync(responsavel, usuario, dados.Papel);
+        return contas;
     }
 
-    public async Task<ResponsavelContaDto> CriarResponsavelAsync(
-        CriarResponsavelConta dados,
+    public async Task<ContaIdentityDto> CriarContaAsync(
+        CriarContaIdentity dados,
         CancellationToken cancellationToken = default)
     {
-        ValidarDadosCadastro(dados);
+        PapeisSistema.Validar(dados.Papel);
+        if (string.IsNullOrWhiteSpace(dados.Email) || string.IsNullOrWhiteSpace(dados.Senha))
+        {
+            throw new ArgumentException("E-mail e senha são obrigatórios.", nameof(dados));
+        }
 
-        await using var transacao = await context.Database.BeginTransactionAsync(cancellationToken);
+        var email = dados.Email.Trim();
         var usuario = new UsuarioIdentity
         {
-            UserName = dados.Email.Trim(),
-            Email = dados.Email.Trim(),
+            UserName = email,
+            Email = email,
             Ativo = true
         };
 
-        var resultado = await userManager.CreateAsync(usuario, dados.Senha);
-        if (!resultado.Succeeded)
-            LancarFalhaIdentity(resultado);
+        LancarSeFalha(await userManager.CreateAsync(usuario, dados.Senha));
+        LancarSeFalha(await userManager.AddToRoleAsync(usuario, dados.Papel));
 
-        var papelAdicionado = await userManager.AddToRoleAsync(usuario, dados.Papel);
-        if (!papelAdicionado.Succeeded)
-            LancarFalhaIdentity(papelAdicionado);
-
-        var responsavel = Responsavel.Criar(usuario.Id, dados.Nome);
-        context.Responsaveis.Add(responsavel);
-        await SalvarAlteracoesAsync(cancellationToken);
-        await transacao.CommitAsync(cancellationToken);
-
-        return await CriarResponsavelContaDtoAsync(responsavel, usuario, dados.Papel);
+        return new ContaIdentityDto(usuario.Id, usuario.Email!, usuario.Ativo, [dados.Papel]);
     }
 
-    public async Task<ResponsavelContaDto?> DesativarResponsavelAsync(
-        Guid responsavelId,
-        int versao,
-        string usuarioExecutorId,
+    public async Task AtualizarContaAsync(
+        string usuarioId,
+        string email,
+        string papel,
         CancellationToken cancellationToken = default)
     {
-        await using var transacao = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-        var responsavel = await context.Responsaveis
-            .SingleOrDefaultAsync(item => item.Id == responsavelId, cancellationToken);
-
-        if (responsavel is null)
-            return null;
-
-        if (versao < 1 || responsavel.Versao != versao)
-            throw new ConflitoDeConcorrenciaException();
-
-        if (responsavel.UsuarioId == usuarioExecutorId)
-            throw new DomainRuleViolationException("REGISTRO_PROTEGIDO", "O gestor não pode desativar a própria conta.");
-
-        var usuario = await userManager.FindByIdAsync(responsavel.UsuarioId)
-            ?? throw new InvalidOperationException("A conta do responsavel nao foi encontrada.");
-
-        if (await userManager.IsInRoleAsync(usuario, PapeisSistema.Gestor))
+        PapeisSistema.Validar(papel);
+        if (string.IsNullOrWhiteSpace(email))
         {
-            var gestoresAtivos = await (
-                from conta in context.Users
-                join usuarioPapel in context.UserRoles on conta.Id equals usuarioPapel.UserId
-                join papel in context.Roles on usuarioPapel.RoleId equals papel.Id
-                where conta.Ativo && papel.Name == PapeisSistema.Gestor
-                select conta.Id).CountAsync(cancellationToken);
-
-            if (gestoresAtivos <= 1)
-                throw new DomainRuleViolationException("REGISTRO_PROTEGIDO", "O último gestor ativo não pode ser desativado.");
+            throw new ArgumentException("O e-mail é obrigatório.", nameof(email));
         }
 
-        var possuiTarefaVisivelNaoConcluida = await context.Tarefas.AnyAsync(
-            tarefa => tarefa.ResponsavelId == responsavelId && tarefa.ExcluidoEm == null && tarefa.ConcluidaEm == null,
-            cancellationToken);
-        responsavel.Desativar(possuiTarefaVisivelNaoConcluida);
+        var usuario = await userManager.FindByIdAsync(usuarioId)
+            ?? throw new InvalidOperationException("Conta de autenticação não encontrada.");
+
+        usuario.Email = email.Trim();
+        usuario.UserName = email.Trim();
+        LancarSeFalha(await userManager.UpdateAsync(usuario));
+
+        var papeisAtuais = await userManager.GetRolesAsync(usuario);
+        if (papeisAtuais.Count > 0)
+        {
+            LancarSeFalha(await userManager.RemoveFromRolesAsync(usuario, papeisAtuais));
+        }
+
+        LancarSeFalha(await userManager.AddToRoleAsync(usuario, papel));
+    }
+
+    public async Task DesativarContaAsync(
+        string usuarioId,
+        CancellationToken cancellationToken = default)
+    {
+        var usuario = await userManager.FindByIdAsync(usuarioId)
+            ?? throw new InvalidOperationException("Conta de autenticação não encontrada.");
 
         usuario.Ativo = false;
-        var resultado = await userManager.UpdateAsync(usuario);
-        if (!resultado.Succeeded)
-            LancarFalhaIdentity(resultado);
-
-        await SalvarAlteracoesAsync(cancellationToken);
-        await transacao.CommitAsync(cancellationToken);
-        return await CriarResponsavelContaDtoAsync(responsavel, usuario);
+        LancarSeFalha(await userManager.UpdateAsync(usuario));
     }
 
-    public async Task<bool?> ExcluirResponsavelAsync(
-        Guid responsavelId,
-        int versao,
-        string usuarioExecutorId,
+    public async Task ExcluirContaAsync(
+        string usuarioId,
         CancellationToken cancellationToken = default)
     {
-        await using var transacao = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-        var responsavel = await context.Responsaveis
-            .SingleOrDefaultAsync(item => item.Id == responsavelId, cancellationToken);
+        var usuario = await userManager.FindByIdAsync(usuarioId)
+            ?? throw new InvalidOperationException("Conta de autenticação não encontrada.");
 
-        if (responsavel is null)
-            return null;
-
-        if (versao < 1 || responsavel.Versao != versao)
-            throw new ConflitoDeConcorrenciaException();
-
-        if (responsavel.UsuarioId == usuarioExecutorId)
-            throw new DomainRuleViolationException("REGISTRO_PROTEGIDO", "O gestor não pode excluir a própria conta.");
-
-        var usuario = await userManager.FindByIdAsync(responsavel.UsuarioId)
-            ?? throw new InvalidOperationException("A conta do responsavel nao foi encontrada.");
-
-        if (await userManager.IsInRoleAsync(usuario, PapeisSistema.Gestor))
-        {
-            var gestoresAtivos = await (
-                from conta in context.Users
-                join usuarioPapel in context.UserRoles on conta.Id equals usuarioPapel.UserId
-                join papel in context.Roles on usuarioPapel.RoleId equals papel.Id
-                where conta.Ativo && papel.Name == PapeisSistema.Gestor
-                select conta.Id).CountAsync(cancellationToken);
-
-            if (gestoresAtivos <= 1)
-                throw new DomainRuleViolationException("REGISTRO_PROTEGIDO", "O último gestor ativo não pode ser excluído.");
-        }
-
-        var possuiReferencias = await context.Tarefas.AnyAsync(
-            tarefa => tarefa.ResponsavelId == responsavelId,
-            cancellationToken);
-        responsavel.GarantirPodeSerExcluido(possuiReferencias);
-
-        context.Responsaveis.Remove(responsavel);
-        var resultado = await userManager.DeleteAsync(usuario);
-        if (!resultado.Succeeded)
-            LancarFalhaIdentity(resultado);
-
-        await SalvarAlteracoesAsync(cancellationToken);
-        await transacao.CommitAsync(cancellationToken);
-        return true;
+        LancarSeFalha(await userManager.DeleteAsync(usuario));
     }
+
+    public Task<int> ContarGestoresAtivosAsync(CancellationToken cancellationToken = default) =>
+        (from usuario in context.Users.AsNoTracking()
+         join usuarioPapel in context.UserRoles.AsNoTracking() on usuario.Id equals usuarioPapel.UserId
+         join papel in context.Roles.AsNoTracking() on usuarioPapel.RoleId equals papel.Id
+         where usuario.Ativo && papel.Name == PapeisSistema.Gestor
+         select usuario.Id)
+        .CountAsync(cancellationToken);
 
     private async Task<ContaAutenticada> CriarContaAutenticadaAsync(UsuarioIdentity usuario)
     {
@@ -252,90 +162,30 @@ public sealed class ContaIdentityService(
         return new ContaAutenticada(usuario.Id, usuario.Email!, papeis.ToArray());
     }
 
-    private async Task<ResponsavelContaDto> CriarResponsavelContaDtoAsync(
-        Responsavel responsavel,
-        UsuarioIdentity usuario,
-        string? papel = null)
+    private async Task<ContaIdentityDto> CriarContaDtoAsync(UsuarioIdentity usuario)
     {
-        var papelDaConta = papel ?? (await userManager.GetRolesAsync(usuario)).SingleOrDefault() ?? string.Empty;
-
-        return new ResponsavelContaDto(
-            responsavel.Id,
-            usuario.Id,
-            responsavel.Nome,
-            usuario.Email ?? string.Empty,
-            papelDaConta,
-            responsavel.Ativo && usuario.Ativo,
-            responsavel.Versao);
+        var papeis = await userManager.GetRolesAsync(usuario);
+        return new ContaIdentityDto(usuario.Id, usuario.Email!, usuario.Ativo, papeis.ToArray());
     }
 
-    private IQueryable<ResponsavelContaDto> CriarConsultaResponsaveisComPerfis(Guid? responsavelId = null) =>
-        from responsavel in context.Responsaveis.AsNoTracking()
-        join usuario in context.Users.AsNoTracking() on responsavel.UsuarioId equals usuario.Id
-        join usuarioPapel in context.UserRoles.AsNoTracking() on usuario.Id equals usuarioPapel.UserId into usuarioPapeis
-        from usuarioPapel in usuarioPapeis.DefaultIfEmpty()
-        join papel in context.Roles.AsNoTracking() on usuarioPapel.RoleId equals papel.Id into papeis
-        from papel in papeis.DefaultIfEmpty()
-        where !responsavelId.HasValue || responsavel.Id == responsavelId.Value
-        orderby responsavel.Nome
-        select new ResponsavelContaDto(
-            responsavel.Id,
-            usuario.Id,
-            responsavel.Nome,
-            usuario.Email ?? string.Empty,
-            papel.Name ?? string.Empty,
-            responsavel.Ativo && usuario.Ativo,
-            responsavel.Versao);
-
-    private async Task SalvarAlteracoesAsync(CancellationToken cancellationToken)
+    private static void LancarSeFalha(IdentityResult resultado)
     {
-        try
+        if (resultado.Succeeded)
         {
-            await context.SaveChangesAsync(cancellationToken);
+            return;
         }
-        catch (DbUpdateConcurrencyException)
+
+        var erros = resultado.Errors.ToArray();
+        if (erros.Any(erro => erro.Code is "DuplicateEmail" or "DuplicateUserName"))
+        {
+            throw new ValorDuplicadoException("Já existe uma conta cadastrada com este e-mail.");
+        }
+
+        if (erros.Any(erro => erro.Code == "ConcurrencyFailure"))
         {
             throw new ConflitoDeConcorrenciaException();
         }
-        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.SerializationFailure })
-        {
-            throw new ConflitoDeConcorrenciaException();
-        }
-    }
 
-    private static void LancarFalhaIdentity(IdentityResult resultado)
-    {
-        if (resultado.Errors.Any(erro => erro.Code is "DuplicateEmail" or "DuplicateUserName"))
-            throw new ValorDuplicadoException("O e-mail já está em uso.");
-        if (resultado.Errors.Any(erro => erro.Code == "ConcurrencyFailure"))
-            throw new ConflitoDeConcorrenciaException();
-
-        throw new InvalidOperationException(string.Join(" ", resultado.Errors.Select(erro => erro.Description)));
-    }
-
-    private static void ValidarDadosCadastro(CriarResponsavelConta dados)
-    {
-        ArgumentNullException.ThrowIfNull(dados);
-
-        if (string.IsNullOrWhiteSpace(dados.Nome) || string.IsNullOrWhiteSpace(dados.Email) || string.IsNullOrWhiteSpace(dados.Senha))
-            throw new ArgumentException("Nome, e-mail e senha são obrigatórios.", nameof(dados));
-
-        if (!PapeisSistema.Valido(dados.Papel))
-            throw new ArgumentException("O papel deve ser Usuario ou Gestor.", nameof(dados));
-
-    }
-
-    private static void ValidarDadosAtualizacao(AtualizarResponsavelConta dados)
-    {
-        ArgumentNullException.ThrowIfNull(dados);
-
-        if (string.IsNullOrWhiteSpace(dados.Nome) || string.IsNullOrWhiteSpace(dados.Email) || string.IsNullOrWhiteSpace(dados.Papel))
-            throw new ArgumentException("Nome, e-mail e papel sao obrigatorios.", nameof(dados));
-
-        if (!PapeisSistema.Valido(dados.Papel))
-            throw new ArgumentException("O papel deve ser Usuario ou Gestor.", nameof(dados));
-
-        if (dados.Versao < 1)
-            throw new ArgumentException("A versão deve ser maior que zero.", nameof(dados));
+        throw new ArgumentException(string.Join(" ", erros.Select(erro => erro.Description)));
     }
 }

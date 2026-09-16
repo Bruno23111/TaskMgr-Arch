@@ -1,7 +1,6 @@
 namespace TaskManager.CleanArch.Application.DTOs.Autenticacao;
 
-public sealed record CriarResponsavelConta(
-    string Nome,
+public sealed record CriarContaIdentity(
     string Email,
     string Senha,
     string Papel);
