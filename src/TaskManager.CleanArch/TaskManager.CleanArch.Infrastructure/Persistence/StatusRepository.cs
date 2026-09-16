@@ -14,6 +14,9 @@ public sealed class StatusRepository(TaskManagerCleanArchDbContext context) : IS
         context.Statuses.OrderBy(status => status.Codigo)
             .FirstOrDefaultAsync(status => status.Categoria == CategoriaStatus.Pendente, cancellationToken);
 
+    public async Task<IReadOnlyList<StatusTarefa>> ListarAsync(CancellationToken cancellationToken = default) =>
+        await context.Statuses.AsNoTracking().OrderBy(status => status.Codigo).ToArrayAsync(cancellationToken);
+
     public Task<bool> CodigoEmUsoAsync(string codigo, Guid? ignorarStatusId = null, CancellationToken cancellationToken = default) =>
         context.Statuses.AnyAsync(status => status.Codigo == codigo.ToUpperInvariant() &&
             (!ignorarStatusId.HasValue || status.Id != ignorarStatusId.Value), cancellationToken);

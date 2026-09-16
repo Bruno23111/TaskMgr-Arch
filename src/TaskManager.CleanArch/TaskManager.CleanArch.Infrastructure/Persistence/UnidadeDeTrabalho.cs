@@ -1,6 +1,7 @@
 using TaskManager.CleanArch.Application.Abstractions.Persistence;
 using TaskManager.CleanArch.Application.Common;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace TaskManager.CleanArch.Infrastructure.Persistence;
 
@@ -15,6 +16,10 @@ public sealed class UnidadeDeTrabalho(TaskManagerCleanArchDbContext context) : I
         catch (DbUpdateConcurrencyException)
         {
             throw new ConflitoDeConcorrenciaException();
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            throw new ValorDuplicadoException("Já existe um registro com esse valor único.");
         }
     }
 
