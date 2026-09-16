@@ -19,15 +19,18 @@ public sealed class CriarTarefaCommandHandler(
     public async Task<TarefaDto> Handle(CriarTarefaCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirGestor();
-        if (await projetos.ObterPorIdAsync(request.ProjetoId, cancellationToken) is null)
-            throw new RecursoNaoEncontradoException("Projeto");
+        return await unidadeDeTrabalho.ExecutarEmTransacaoSerializavelAsync(async token =>
+        {
+            if (!await projetos.BloquearParaAtualizacaoAsync(request.ProjetoId, token))
+                throw new RecursoNaoEncontradoException("Projeto");
 
-        var statusInicial = await status.ObterPendenteInicialAsync(cancellationToken)
-            ?? throw new RecursoNaoEncontradoException("Status inicial pendente");
-            
-        var tarefa = Tarefa.Criar(request.ProjetoId, request.Titulo, request.Descricao, statusInicial.Id);
-        tarefas.Adicionar(tarefa);
-        await unidadeDeTrabalho.SalvarAlteracoesAsync(cancellationToken);
-        return tarefa.ParaDto();
+            var statusInicial = await status.ObterPendenteInicialAsync(token)
+                ?? throw new RecursoNaoEncontradoException("Status inicial pendente");
+
+            var tarefa = Tarefa.Criar(request.ProjetoId, request.Titulo, request.Descricao, statusInicial.Id);
+            tarefas.Adicionar(tarefa);
+            await unidadeDeTrabalho.SalvarAlteracoesAsync(token);
+            return tarefa.ParaDto();
+        }, cancellationToken);
     }
 }

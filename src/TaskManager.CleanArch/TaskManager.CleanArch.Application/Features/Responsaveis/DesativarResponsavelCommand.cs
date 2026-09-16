@@ -23,6 +23,11 @@ public sealed class DesativarResponsavelCommandHandler(
 
         return unidadeDeTrabalho.ExecutarEmTransacaoSerializavelAsync(async token =>
         {
+            if (!await responsaveis.BloquearParaAtualizacaoAsync(request.Id, token))
+            {
+                return null;
+            }
+
             var responsavel = await responsaveis.ObterPorIdAsync(request.Id, token);
             if (responsavel is null)
             {
@@ -47,7 +52,7 @@ public sealed class DesativarResponsavelCommandHandler(
                     "O último gestor ativo não pode ser desativado.");
             }
 
-            responsavel.Desativar(await tarefas.PossuiTarefasParaResponsavelAsync(responsavel.Id, token));
+            responsavel.Desativar(await tarefas.PossuiTarefasVisiveisNaoConcluidasParaResponsavelAsync(responsavel.Id, token));
             await contas.DesativarContaAsync(responsavel.UsuarioId, token);
             await unidadeDeTrabalho.SalvarAlteracoesAsync(token);
 

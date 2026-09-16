@@ -22,6 +22,11 @@ public sealed class ExcluirResponsavelCommandHandler(
 
         return unidadeDeTrabalho.ExecutarEmTransacaoSerializavelAsync<bool?>(async token =>
         {
+            if (!await responsaveis.BloquearParaAtualizacaoAsync(request.Id, token))
+            {
+                return null;
+            }
+
             var responsavel = await responsaveis.ObterPorIdAsync(request.Id, token);
             if (responsavel is null)
             {

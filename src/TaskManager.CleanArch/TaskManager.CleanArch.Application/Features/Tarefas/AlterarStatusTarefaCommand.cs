@@ -4,6 +4,7 @@ using TaskManager.CleanArch.Application.Abstractions.Persistence;
 using TaskManager.CleanArch.Application.Abstractions.Services;
 using TaskManager.CleanArch.Application.Common;
 using TaskManager.CleanArch.Application.DTOs;
+using TaskManager.CleanArch.Domain.Common;
 
 namespace TaskManager.CleanArch.Application.Features.Tarefas;
 
@@ -11,6 +12,7 @@ public sealed record AlterarStatusTarefaCommand(Guid TarefaId, Guid StatusId, in
 
 public sealed class AlterarStatusTarefaCommandHandler(
     ITarefaRepository tarefas,
+    IProjetoRepository projetos,
     IStatusRepository status,
     IResponsavelRepository responsaveis,
     IUnidadeDeTrabalho unidadeDeTrabalho,
@@ -22,39 +24,45 @@ public sealed class AlterarStatusTarefaCommandHandler(
     {
         usuarioAtual.ExigirAutenticado();
 
-        var tarefa = await tarefas.ObterPorIdAsync(request.TarefaId, cancellationToken)
-            ?? throw new RecursoNaoEncontradoException("Tarefa");
-
-        var statusAtual = await status.ObterPorIdAsync(tarefa.StatusId, cancellationToken)
-            ?? throw new RecursoNaoEncontradoException("Status atual da tarefa");
-
-        var novoStatus = await status.ObterPorIdAsync(request.StatusId, cancellationToken)
-            ?? throw new RecursoNaoEncontradoException("Novo status");
-
-        if (!usuarioAtual.Gestor)
+        IReadOnlyCollection<IDomainEvent> eventos = [];
+        var resultado = await unidadeDeTrabalho.ExecutarEmTransacaoSerializavelAsync(async token =>
         {
-            var responsavelAtual = await responsaveis.ObterPorUsuarioIdAsync(usuarioAtual.UsuarioId, cancellationToken);
+            var tarefa = await tarefas.ObterPorIdAsync(request.TarefaId, token)
+                ?? throw new RecursoNaoEncontradoException("Tarefa");
+            if (!await projetos.BloquearParaAtualizacaoAsync(tarefa.ProjetoId, token))
+                throw new RecursoNaoEncontradoException("Projeto");
 
-            if (responsavelAtual?.Id != tarefa.ResponsavelId)
-                throw new AcessoNegadoException();
-        }
+            var statusAtual = await status.ObterPorIdAsync(tarefa.StatusId, token)
+                ?? throw new RecursoNaoEncontradoException("Status atual da tarefa");
+            var novoStatus = await status.ObterPorIdAsync(request.StatusId, token)
+                ?? throw new RecursoNaoEncontradoException("Novo status");
 
-        tarefa.Versao.ExigirVersao(request.Versao);
+            if (!usuarioAtual.Gestor)
+            {
+                var responsavelAtual = await responsaveis.ObterPorUsuarioIdAsync(usuarioAtual.UsuarioId, token);
+                if (responsavelAtual?.Id != tarefa.ResponsavelId)
+                    throw new AcessoNegadoException();
+            }
 
-        var responsavelDaTarefa = tarefa.ResponsavelId is { } responsavelId
-            ? await responsaveis.ObterPorIdAsync(responsavelId, cancellationToken)
-            : null;
+            tarefa.Versao.ExigirVersao(request.Versao);
+            var responsavelDaTarefa = tarefa.ResponsavelId is { } responsavelId
+                ? await responsaveis.ObterPorIdAsync(responsavelId, token)
+                : null;
 
-        tarefa.AlterarStatus(
-            novoStatus.Id,
-            statusAtual.Categoria,
-            novoStatus.Categoria,
-            responsavelDaTarefa?.Ativo == true,
-            usuarioAtual.Gestor,
-            relogio.DataHoraAgoraUTC);
+            tarefa.AlterarStatus(
+                novoStatus.Id,
+                statusAtual.Categoria,
+                novoStatus.Categoria,
+                responsavelDaTarefa?.Ativo == true,
+                usuarioAtual.Gestor,
+                relogio.DataHoraAgoraUTC);
 
-        await tarefa.SalvarDespacharAsync(unidadeDeTrabalho, dispatcher, cancellationToken);
+            await unidadeDeTrabalho.SalvarAlteracoesAsync(token);
+            eventos = tarefa.LimparDomainEvents();
+            return tarefa.ParaDto();
+        }, cancellationToken);
 
-        return tarefa.ParaDto();
+        await dispatcher.DespacharAsync(eventos, cancellationToken);
+        return resultado;
     }
 }

@@ -168,7 +168,7 @@ components:
     Responsavel: { type: object, required: [id, usuarioId, nome, email, ativo, papel, versao], properties: { id: { type: string, format: uuid }, usuarioId: { type: string }, nome: { type: string }, email: { type: string, format: email }, ativo: { type: boolean }, papel: { type: string, enum: [Usuario, Gestor] }, versao: { type: integer, minimum: 1 } } }
     StatusCreateRequest: { type: object, required: [codigo, nome, categoria], properties: { codigo: { type: string, maxLength: 20 }, nome: { type: string, maxLength: 60 }, categoria: { type: string, enum: [PENDENTE, EM_ANDAMENTO, CONCLUIDA] } } }
     StatusUpdateRequest: { type: object, required: [nome, versao], properties: { nome: { type: string, maxLength: 60 }, versao: { type: integer, minimum: 1 } } }
-    Status: { allOf: [ { $ref: '#/components/schemas/StatusCreateRequest' }, { type: object, required: [id, protegido], properties: { id: { type: string, format: uuid }, protegido: { type: boolean } } } ] }
+    Status: { allOf: [ { $ref: '#/components/schemas/StatusCreateRequest' }, { type: object, required: [id, protegido, versao], properties: { id: { type: string, format: uuid }, protegido: { type: boolean }, versao: { type: integer, minimum: 1 } } } ] }
     PaginaProjeto: { type: object, required: [itens, pagina, tamanho, total], properties: { itens: { type: array, items: { $ref: '#/components/schemas/Projeto' } }, pagina: { type: integer }, tamanho: { type: integer }, total: { type: integer } } }
     PaginaTarefa: { type: object, required: [itens, pagina, tamanho, total], properties: { itens: { type: array, items: { $ref: '#/components/schemas/Tarefa' } }, pagina: { type: integer }, tamanho: { type: integer }, total: { type: integer } } }
     ProblemDetails:

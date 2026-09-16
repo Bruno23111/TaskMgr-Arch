@@ -12,6 +12,15 @@ public sealed class ResponsavelRepository(TaskManagerCleanArchDbContext context)
     public Task<Responsavel?> ObterPorUsuarioIdAsync(string usuarioId, CancellationToken cancellationToken = default) =>
         context.Responsaveis.SingleOrDefaultAsync(responsavel => responsavel.UsuarioId == usuarioId, cancellationToken);
 
+    public async Task<bool> BloquearParaAtualizacaoAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var responsavelBloqueado = await context.Database
+            .SqlQuery<Guid>($"SELECT \"Id\" AS \"Value\" FROM \"Responsaveis\" WHERE \"Id\" = {id} FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return responsavelBloqueado != Guid.Empty;
+    }
+
     public async Task<IReadOnlyList<Responsavel>> ListarAsync(CancellationToken cancellationToken = default) =>
         await context.Responsaveis.AsNoTracking().OrderBy(responsavel => responsavel.Nome).ToArrayAsync(cancellationToken);
 

@@ -23,7 +23,7 @@ public sealed class AtribuirResponsavelTarefaCommandHandler(
         if (request.ResponsavelId == Guid.Empty)
             throw new ArgumentException("O responsável é obrigatório.", nameof(request.ResponsavelId));
 
-        return await unidadeDeTrabalho.ExecutarEmTransacaoAsync(async token =>
+        return await unidadeDeTrabalho.ExecutarEmTransacaoSerializavelAsync(async token =>
         {
             var tarefa = await tarefas.ObterPorIdAsync(request.TarefaId, token)
                 ?? throw new RecursoNaoEncontradoException("Tarefa");
@@ -33,6 +33,9 @@ public sealed class AtribuirResponsavelTarefaCommandHandler(
             tarefa.Versao.ExigirVersao(request.Versao);
             var statusAtual = await status.ObterPorIdAsync(tarefa.StatusId, token)
                 ?? throw new RecursoNaoEncontradoException("Status da tarefa");
+            if (!await responsaveis.BloquearParaAtualizacaoAsync(request.ResponsavelId, token))
+                throw new RecursoNaoEncontradoException("Responsável");
+
             var responsavel = await responsaveis.ObterPorIdAsync(request.ResponsavelId, token)
                 ?? throw new RecursoNaoEncontradoException("Responsável");
 
