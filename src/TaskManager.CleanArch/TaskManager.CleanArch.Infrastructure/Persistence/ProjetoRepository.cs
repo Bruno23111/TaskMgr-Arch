@@ -10,6 +10,15 @@ public sealed class ProjetoRepository(TaskManagerCleanArchDbContext context) : I
     public Task<Projeto?> ObterPorIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         context.Projetos.SingleOrDefaultAsync(projeto => projeto.Id == id, cancellationToken);
 
+    public async Task<bool> BloquearParaAtualizacaoAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var projetoBloqueado = await context.Database
+            .SqlQuery<Guid>($"SELECT \"Id\" AS \"Value\" FROM \"Projetos\" WHERE \"Id\" = {id} AND \"ExcluidoEm\" IS NULL FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return projetoBloqueado != Guid.Empty;
+    }
+
     public async Task<ResultadoPaginado<Projeto>> ListarAsync(RequisicaoPaginada paginacao, CancellationToken cancellationToken = default)
     {
         paginacao.Validar();

@@ -30,6 +30,7 @@ public sealed class UnidadeDeTrabalho(TaskManagerCleanArchDbContext context) : I
         catch
         {
             await transacao.RollbackAsync(cancellationToken);
+            context.ChangeTracker.Clear();
             throw;
         }
     }

@@ -25,6 +25,11 @@ public sealed class TarefasController(ISender sender) : ControllerBase
         return Ok(resultado);
     }
 
+    [HttpGet("{tarefaId:guid}")]
+    [ProducesResponseType<TarefaDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<TarefaDto>> Obter(Guid tarefaId, CancellationToken cancellationToken)
+        => Ok(await sender.Send(new ObterTarefaQuery(tarefaId), cancellationToken));
+
     [HttpPost]
     [ProducesResponseType<TarefaDto>(StatusCodes.Status201Created)]
     public async Task<ActionResult<TarefaDto>> Criar(
@@ -59,5 +64,32 @@ public sealed class TarefasController(ISender sender) : ControllerBase
             new AlterarStatusTarefaCommand(tarefaId, request.StatusId, request.Versao),
             cancellationToken);
         return Ok(tarefa);
+    }
+
+    [HttpPut("{tarefaId:guid}/responsavel")]
+    [ProducesResponseType<TarefaDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<TarefaDto>> AtribuirResponsavel(
+        Guid tarefaId,
+        AtribuirResponsavelRequest request,
+        CancellationToken cancellationToken)
+        => Ok(await sender.Send(new AtribuirResponsavelTarefaCommand(tarefaId, request.ResponsavelId, request.Versao), cancellationToken));
+
+    [HttpDelete("{tarefaId:guid}/responsavel")]
+    [ProducesResponseType<TarefaDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<TarefaDto>> RemoverResponsavel(
+        Guid tarefaId,
+        [FromQuery] int versao,
+        CancellationToken cancellationToken)
+        => Ok(await sender.Send(new RemoverResponsavelTarefaCommand(tarefaId, versao), cancellationToken));
+
+    [HttpDelete("{tarefaId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> Excluir(
+        Guid tarefaId,
+        [FromQuery] int versao,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new ExcluirTarefaCommand(tarefaId, versao), cancellationToken);
+        return NoContent();
     }
 }
