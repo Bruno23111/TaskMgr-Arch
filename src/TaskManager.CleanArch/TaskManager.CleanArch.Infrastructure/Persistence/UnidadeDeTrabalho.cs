@@ -22,6 +22,10 @@ public sealed class UnidadeDeTrabalho(TaskManagerCleanArchDbContext context) : I
         {
             throw new ValorDuplicadoException("Já existe um registro com esse valor único.");
         }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.SerializationFailure })
+        {
+            throw new ConflitoDeConcorrenciaException();
+        }
     }
 
     public async Task<T> ExecutarEmTransacaoAsync<T>(Func<CancellationToken, Task<T>> operacao, CancellationToken cancellationToken = default)

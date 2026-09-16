@@ -17,7 +17,7 @@ public sealed class ListarResponsaveisQueryHandler(
         ListarResponsaveisQuery request,
         CancellationToken cancellationToken)
     {
-        usuarioAtual.ExigirGestor();
+        usuarioAtual.ExigirAutenticado();
 
         var perfis = await responsaveis.ListarAsync(cancellationToken);
         var contasPorUsuario = await contas.ObterContasAsync(perfis.Select(perfil => perfil.UsuarioId), cancellationToken);
@@ -39,7 +39,7 @@ public sealed class ObterResponsavelPorIdQueryHandler(
         ObterResponsavelPorIdQuery request,
         CancellationToken cancellationToken)
     {
-        usuarioAtual.ExigirGestor();
+        usuarioAtual.ExigirAutenticado();
 
         var perfil = await responsaveis.ObterPorIdAsync(request.Id, cancellationToken);
         if (perfil is null)

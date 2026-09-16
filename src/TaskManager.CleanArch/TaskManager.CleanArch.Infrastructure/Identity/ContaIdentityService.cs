@@ -86,7 +86,6 @@ public sealed class ContaIdentityService(
         }
 
         var email = dados.Email.Trim();
-
         var usuario = new UsuarioIdentity
         {
             UserName = email,

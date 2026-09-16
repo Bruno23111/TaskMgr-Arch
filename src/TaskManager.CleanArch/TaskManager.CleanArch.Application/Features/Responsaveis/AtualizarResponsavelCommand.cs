@@ -11,7 +11,8 @@ public sealed record AtualizarResponsavelCommand(
     Guid Id,
     string Nome,
     string Email,
-    string Papel) : IRequest<ResponsavelContaDto?>;
+    string Papel,
+    int Versao) : IRequest<ResponsavelContaDto?>;
 
 public sealed class AtualizarResponsavelCommandHandler(
     IContaIdentityService contas,
@@ -22,6 +23,7 @@ public sealed class AtualizarResponsavelCommandHandler(
     public Task<ResponsavelContaDto?> Handle(AtualizarResponsavelCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirGestor();
+        request.Versao.ExigirVersaoInformada();
         PapeisSistema.Validar(request.Papel);
         if (string.IsNullOrWhiteSpace(request.Nome))
         {
@@ -36,6 +38,7 @@ public sealed class AtualizarResponsavelCommandHandler(
                 return null;
             }
 
+            responsavel.Versao.ExigirVersao(request.Versao);
             var conta = await contas.ObterContaAsync(responsavel.UsuarioId, token)
                 ?? throw new InvalidOperationException("Conta de autenticação não encontrada.");
 

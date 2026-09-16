@@ -34,5 +34,6 @@ internal static class MapeamentosDto
             responsavel.Nome,
             conta.Email,
             conta.Papeis.SingleOrDefault() ?? string.Empty,
-            responsavel.Ativo && conta.Ativo);
+            responsavel.Ativo && conta.Ativo,
+            responsavel.Versao);
 }
