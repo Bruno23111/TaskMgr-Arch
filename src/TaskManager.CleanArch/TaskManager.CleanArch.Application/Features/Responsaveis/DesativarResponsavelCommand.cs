@@ -14,6 +14,7 @@ public sealed class DesativarResponsavelCommandHandler(
     public Task<ResponsavelContaDto?> Handle(DesativarResponsavelCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirGestor();
+        request.Versao.ExigirVersaoInformada();
         return contas.DesativarResponsavelAsync(
             request.Id,
             request.Versao,

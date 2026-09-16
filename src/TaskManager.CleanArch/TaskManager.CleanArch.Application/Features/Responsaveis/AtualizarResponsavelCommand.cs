@@ -9,7 +9,8 @@ public sealed record AtualizarResponsavelCommand(
     Guid Id,
     string Nome,
     string Email,
-    string Papel) : IRequest<ResponsavelContaDto?>;
+    string Papel,
+    int Versao) : IRequest<ResponsavelContaDto?>;
 
 public sealed class AtualizarResponsavelCommandHandler(
     IContaIdentityService contas,
@@ -20,10 +21,11 @@ public sealed class AtualizarResponsavelCommandHandler(
         CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirGestor();
+        request.Versao.ExigirVersaoInformada();
 
         return contas.AtualizarResponsavelAsync(
             request.Id,
-            new AtualizarResponsavelConta(request.Nome, request.Email, request.Papel),
+            new AtualizarResponsavelConta(request.Nome, request.Email, request.Papel, request.Versao),
             cancellationToken);
     }
 }

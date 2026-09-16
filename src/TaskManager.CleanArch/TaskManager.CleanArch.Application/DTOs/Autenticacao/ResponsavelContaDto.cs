@@ -6,4 +6,5 @@ public sealed record ResponsavelContaDto(
     string Nome,
     string Email,
     string Papel,
-    bool Ativo);
+    bool Ativo,
+    int Versao);
