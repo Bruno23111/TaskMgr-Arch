@@ -1,7 +1,9 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace TaskManager.CleanArch.WebAPI.Contracts.Requests;
 
 public sealed record CriarResponsavelRequest(
-    string Nome,
-    string Email,
-    string Senha,
-    string Papel);
+    [property: Required, MaxLength(100)] string Nome,
+    [property: Required, EmailAddress] string Email,
+    [property: Required, MinLength(8)] string Senha,
+    [property: Required] string Papel);

@@ -13,6 +13,7 @@ public sealed class ExcluirProjetoCommandHandler(IProjetoRepository projetos, IT
     public async Task Handle(ExcluirProjetoCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirGestor();
+        request.Versao.ExigirVersaoInformada();
         await unidadeDeTrabalho.ExecutarEmTransacaoSerializavelAsync(async token =>
         {
             if (!await projetos.BloquearParaAtualizacaoAsync(request.ProjetoId, token))

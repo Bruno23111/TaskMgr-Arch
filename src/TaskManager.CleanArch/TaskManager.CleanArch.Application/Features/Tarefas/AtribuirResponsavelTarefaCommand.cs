@@ -34,10 +34,10 @@ public sealed class AtribuirResponsavelTarefaCommandHandler(
             var statusAtual = await status.ObterPorIdAsync(tarefa.StatusId, token)
                 ?? throw new RecursoNaoEncontradoException("Status da tarefa");
             if (!await responsaveis.BloquearParaAtualizacaoAsync(request.ResponsavelId, token))
-                throw new RecursoNaoEncontradoException("Responsável");
+                throw new ArgumentException("O responsável informado não existe.", nameof(request.ResponsavelId));
 
             var responsavel = await responsaveis.ObterPorIdAsync(request.ResponsavelId, token)
-                ?? throw new RecursoNaoEncontradoException("Responsável");
+                ?? throw new ArgumentException("O responsável informado não existe.", nameof(request.ResponsavelId));
 
             tarefa.AtribuirResponsavel(responsavel.Id, statusAtual.Categoria, responsavel.Ativo);
             await unidadeDeTrabalho.SalvarAlteracoesAsync(token);

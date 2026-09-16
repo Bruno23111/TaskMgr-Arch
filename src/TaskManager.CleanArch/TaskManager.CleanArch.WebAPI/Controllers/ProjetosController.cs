@@ -46,7 +46,10 @@ public sealed class ProjetosController(ISender sender) : ControllerBase
 
     [HttpDelete("{projetoId:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public async Task<IActionResult> Excluir(Guid projetoId, [FromQuery] int versao, CancellationToken cancellationToken)
+    public async Task<IActionResult> Excluir(
+        Guid projetoId,
+        [FromQuery] int versao,
+        CancellationToken cancellationToken)
     {
         await sender.Send(new ExcluirProjetoCommand(projetoId, versao), cancellationToken);
         return NoContent();

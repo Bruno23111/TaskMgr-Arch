@@ -23,6 +23,9 @@ public sealed class AlterarStatusTarefaCommandHandler(
     public async Task<TarefaDto> Handle(AlterarStatusTarefaCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirAutenticado();
+        request.Versao.ExigirVersaoInformada();
+        if (request.StatusId == Guid.Empty)
+            throw new ArgumentException("O status é obrigatório.", nameof(request.StatusId));
 
         IReadOnlyCollection<IDomainEvent> eventos = [];
         var resultado = await unidadeDeTrabalho.ExecutarEmTransacaoSerializavelAsync(async token =>
@@ -35,7 +38,7 @@ public sealed class AlterarStatusTarefaCommandHandler(
             var statusAtual = await status.ObterPorIdAsync(tarefa.StatusId, token)
                 ?? throw new RecursoNaoEncontradoException("Status atual da tarefa");
             var novoStatus = await status.ObterPorIdAsync(request.StatusId, token)
-                ?? throw new RecursoNaoEncontradoException("Novo status");
+                ?? throw new ArgumentException("O status informado não existe.", nameof(request.StatusId));
 
             if (!usuarioAtual.Gestor)
             {

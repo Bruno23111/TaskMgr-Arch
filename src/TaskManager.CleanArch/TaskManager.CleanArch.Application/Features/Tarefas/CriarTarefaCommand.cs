@@ -22,10 +22,10 @@ public sealed class CriarTarefaCommandHandler(
         return await unidadeDeTrabalho.ExecutarEmTransacaoSerializavelAsync(async token =>
         {
             if (!await projetos.BloquearParaAtualizacaoAsync(request.ProjetoId, token))
-                throw new RecursoNaoEncontradoException("Projeto");
+                throw new ArgumentException("O projeto informado não existe.", nameof(request.ProjetoId));
 
             var statusInicial = await status.ObterPendenteInicialAsync(token)
-                ?? throw new RecursoNaoEncontradoException("Status inicial pendente");
+                ?? throw new InvalidOperationException("O status inicial pendente não está configurado.");
 
             var tarefa = Tarefa.Criar(request.ProjetoId, request.Titulo, request.Descricao, statusInicial.Id);
             tarefas.Adicionar(tarefa);

@@ -18,7 +18,8 @@ public sealed class AtualizarTarefaCommandHandler(
     public async Task<TarefaDto> Handle(AtualizarTarefaCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirAutenticado();
-        
+        request.Versao.ExigirVersaoInformada();
+
         var tarefa = await tarefas.ObterPorIdAsync(request.TarefaId, cancellationToken)
             ?? throw new RecursoNaoEncontradoException("Tarefa");
 

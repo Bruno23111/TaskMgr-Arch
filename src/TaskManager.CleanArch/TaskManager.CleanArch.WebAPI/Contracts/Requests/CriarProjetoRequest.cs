@@ -1,7 +1,9 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace TaskManager.CleanArch.WebAPI.Contracts.Requests;
 
 public sealed record CriarProjetoRequest(
-    string Nome, 
-    string? Descricao
+    [property: Required, MaxLength(100)] string Nome,
+    [property: MaxLength(255)] string? Descricao
     );
 
