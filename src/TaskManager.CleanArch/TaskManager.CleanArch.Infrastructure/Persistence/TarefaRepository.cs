@@ -27,7 +27,7 @@ public sealed class TarefaRepository(TaskManagerCleanArchDbContext context) : IT
         context.Tarefas.AnyAsync(tarefa => tarefa.ResponsavelId == responsavelId && tarefa.ConcluidaEm == null, cancellationToken);
 
     public Task<bool> PossuiTarefasParaStatusAsync(Guid statusId, CancellationToken cancellationToken = default) =>
-        context.Tarefas.AnyAsync(tarefa => tarefa.StatusId == statusId, cancellationToken);
+        context.Tarefas.IgnoreQueryFilters().AnyAsync(tarefa => tarefa.StatusId == statusId, cancellationToken);
 
     public void Adicionar(Tarefa tarefa) => context.Tarefas.Add(tarefa);
     public void Remover(Tarefa tarefa) => context.Tarefas.Remove(tarefa);

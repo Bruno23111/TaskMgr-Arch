@@ -246,6 +246,35 @@ namespace TaskManager.CleanArch.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("StatusTarefa", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("11111111-1111-1111-1111-111111111111"),
+                            Categoria = "Pendente",
+                            Codigo = "PENDENTE",
+                            Nome = "Pendente",
+                            Protegido = true,
+                            Versao = 1
+                        },
+                        new
+                        {
+                            Id = new Guid("22222222-2222-2222-2222-222222222222"),
+                            Categoria = "EmAndamento",
+                            Codigo = "EM_ANDAMENTO",
+                            Nome = "Em andamento",
+                            Protegido = true,
+                            Versao = 1
+                        },
+                        new
+                        {
+                            Id = new Guid("33333333-3333-3333-3333-333333333333"),
+                            Categoria = "Concluida",
+                            Codigo = "CONCLUIDA",
+                            Nome = "Concluída",
+                            Protegido = true,
+                            Versao = 1
+                        });
                 });
 
             modelBuilder.Entity("TaskManager.CleanArch.Domain.Entities.Tarefa", b =>

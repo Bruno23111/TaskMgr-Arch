@@ -2,10 +2,13 @@ using TaskManager.CleanArch.Application.DependencyInjection;
 using TaskManager.CleanArch.WebAPI.Configuration;
 using TaskManager.CleanArch.Infrastructure.DependencyInjection;
 using TaskManager.CleanArch.Infrastructure.Identity;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddJsonOptions(options =>
+    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseUpper)));
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

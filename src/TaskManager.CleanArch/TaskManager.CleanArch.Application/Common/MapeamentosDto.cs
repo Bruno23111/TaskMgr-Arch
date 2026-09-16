@@ -22,4 +22,7 @@ internal static class MapeamentosDto
             tarefa.Descricao,
             tarefa.ConcluidaEm, 
             tarefa.Versao);
+
+    public static StatusTarefaDto ParaDto(this StatusTarefa status) =>
+        new(status.Id, status.Codigo, status.Nome, status.Categoria, status.Protegido, status.Versao);
 }
