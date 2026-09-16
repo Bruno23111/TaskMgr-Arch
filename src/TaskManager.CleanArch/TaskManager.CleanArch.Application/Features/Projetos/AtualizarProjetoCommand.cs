@@ -14,6 +14,7 @@ public sealed class AtualizarProjetoCommandHandler(IProjetoRepository projetos, 
     public async Task<ProjetoDto> Handle(AtualizarProjetoCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirGestor();
+        request.Versao.ExigirVersaoInformada();
         var projeto = await projetos.ObterPorIdAsync(request.ProjetoId, cancellationToken)
             ?? throw new RecursoNaoEncontradoException("Projeto");
         projeto.Versao.ExigirVersao(request.Versao);

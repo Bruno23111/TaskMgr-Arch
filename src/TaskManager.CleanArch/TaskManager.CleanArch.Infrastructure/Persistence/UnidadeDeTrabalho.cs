@@ -22,7 +22,10 @@ public sealed class UnidadeDeTrabalho(TaskManagerCleanArchDbContext context) : I
         {
             throw new ValorDuplicadoException("Já existe um registro com esse valor único.");
         }
-        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.SerializationFailure })
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected
+        })
         {
             throw new ConflitoDeConcorrenciaException();
         }
@@ -50,11 +53,26 @@ public sealed class UnidadeDeTrabalho(TaskManagerCleanArchDbContext context) : I
             await transacao.CommitAsync(cancellationToken);
             return resultado;
         }
-        catch
+        catch (Exception exception)
         {
             await transacao.RollbackAsync(cancellationToken);
             context.ChangeTracker.Clear();
+
+            var postgresException = ObterPostgresException(exception);
+            if (postgresException?.SqlState is PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected)
+            {
+                throw new ConflitoDeConcorrenciaException();
+            }
+
+            if (postgresException?.SqlState == PostgresErrorCodes.UniqueViolation)
+            {
+                throw new ValorDuplicadoException("Já existe um registro com esse valor único.");
+            }
+
             throw;
         }
     }
+
+    private static PostgresException? ObterPostgresException(Exception exception) =>
+        exception as PostgresException ?? exception.InnerException as PostgresException;
 }

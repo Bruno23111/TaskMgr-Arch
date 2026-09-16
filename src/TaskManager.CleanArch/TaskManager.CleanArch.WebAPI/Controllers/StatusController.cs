@@ -28,7 +28,7 @@ public sealed class StatusController(ISender sender) : ControllerBase
     [ProducesResponseType<StatusTarefaDto>(StatusCodes.Status201Created)]
     public async Task<ActionResult<StatusTarefaDto>> Criar(CriarStatusRequest request, CancellationToken cancellationToken)
     {
-        var status = await sender.Send(new CriarStatusCommand(request.Codigo, request.Nome, request.Categoria), cancellationToken);
+        var status = await sender.Send(new CriarStatusCommand(request.Codigo, request.Nome, request.Categoria!.Value), cancellationToken);
         return Created($"/status/{status.Id}", status);
     }
 
@@ -41,7 +41,10 @@ public sealed class StatusController(ISender sender) : ControllerBase
     [HttpDelete("{statusId:guid}")]
     [Authorize(Roles = PapeisSistema.Gestor)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public async Task<IActionResult> Excluir(Guid statusId, [FromQuery] int versao, CancellationToken cancellationToken)
+    public async Task<IActionResult> Excluir(
+        Guid statusId,
+        [FromQuery] int versao,
+        CancellationToken cancellationToken)
     {
         await sender.Send(new ExcluirStatusCommand(statusId, versao), cancellationToken);
         return NoContent();

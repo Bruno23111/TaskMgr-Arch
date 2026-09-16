@@ -1,7 +1,9 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace TaskManager.CleanArch.WebAPI.Contracts.Requests;
 
 public sealed record CriarTarefaRequest(
-    Guid ProjetoId, 
-    string Titulo, 
-    string? Descricao
+    Guid ProjetoId,
+    [property: Required, MaxLength(100)] string Titulo,
+    [property: MaxLength(255)] string? Descricao
     );

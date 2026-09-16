@@ -24,6 +24,9 @@ public sealed class TarefaRepository(TaskManagerCleanArchDbContext context) : IT
     }
 
     public Task<bool> PossuiTarefasParaResponsavelAsync(Guid responsavelId, CancellationToken cancellationToken = default) =>
+        context.Tarefas.IgnoreQueryFilters().AnyAsync(tarefa => tarefa.ResponsavelId == responsavelId, cancellationToken);
+
+    public Task<bool> PossuiTarefasVisiveisNaoConcluidasParaResponsavelAsync(Guid responsavelId, CancellationToken cancellationToken = default) =>
         context.Tarefas.AnyAsync(tarefa => tarefa.ResponsavelId == responsavelId && tarefa.ConcluidaEm == null, cancellationToken);
 
     public Task<bool> PossuiTarefasParaStatusAsync(Guid statusId, CancellationToken cancellationToken = default) =>

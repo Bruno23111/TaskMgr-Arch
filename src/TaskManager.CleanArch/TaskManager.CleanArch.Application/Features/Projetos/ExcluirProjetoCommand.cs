@@ -13,8 +13,12 @@ public sealed class ExcluirProjetoCommandHandler(IProjetoRepository projetos, IT
     public async Task Handle(ExcluirProjetoCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirGestor();
-        await unidadeDeTrabalho.ExecutarEmTransacaoAsync(async token =>
+        request.Versao.ExigirVersaoInformada();
+        await unidadeDeTrabalho.ExecutarEmTransacaoSerializavelAsync(async token =>
         {
+            if (!await projetos.BloquearParaAtualizacaoAsync(request.ProjetoId, token))
+                throw new RecursoNaoEncontradoException("Projeto");
+
             var projeto = await projetos.ObterPorIdAsync(request.ProjetoId, token) ?? throw new RecursoNaoEncontradoException("Projeto");
             projeto.Versao.ExigirVersao(request.Versao);
             if (await projetos.PossuiTarefaEmAndamentoAsync(projeto.Id, token))

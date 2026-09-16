@@ -9,6 +9,7 @@ public interface ITarefaRepository
     Task<IReadOnlyList<Tarefa>> ListarVisiveisPorProjetoAsync(Guid projetoId, CancellationToken cancellationToken = default);
     Task<ResultadoPaginado<Tarefa>> ListarAsync(Guid? projetoId, RequisicaoPaginada paginacao, CancellationToken cancellationToken = default);
     Task<bool> PossuiTarefasParaResponsavelAsync(Guid responsavelId, CancellationToken cancellationToken = default);
+    Task<bool> PossuiTarefasVisiveisNaoConcluidasParaResponsavelAsync(Guid responsavelId, CancellationToken cancellationToken = default);
     Task<bool> PossuiTarefasParaStatusAsync(Guid statusId, CancellationToken cancellationToken = default);
     void Adicionar(Tarefa tarefa);
     void Remover(Tarefa tarefa);
