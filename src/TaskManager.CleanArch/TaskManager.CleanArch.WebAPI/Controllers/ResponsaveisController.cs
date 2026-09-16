@@ -10,7 +10,7 @@ using TaskManager.CleanArch.WebAPI.Contracts.Requests;
 namespace TaskManager.CleanArch.WebAPI.Controllers;
 
 [ApiController]
-[Authorize(Roles = PapeisSistema.Gestor)]
+[Authorize]
 [Route("responsaveis")]
 public sealed class ResponsaveisController(ISender sender) : ControllerBase
 {
@@ -32,6 +32,7 @@ public sealed class ResponsaveisController(ISender sender) : ControllerBase
     }
 
     [HttpPut("{responsavelId:guid}")]
+    [Authorize(Roles = PapeisSistema.Gestor)]
     [ProducesResponseType<ResponsavelContaDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -42,13 +43,14 @@ public sealed class ResponsaveisController(ISender sender) : ControllerBase
         CancellationToken cancellationToken)
     {
         var responsavel = await sender.Send(
-            new AtualizarResponsavelCommand(responsavelId, request.Nome, request.Email, request.Papel),
+            new AtualizarResponsavelCommand(responsavelId, request.Nome, request.Email, request.Papel, request.Versao),
             cancellationToken);
 
         return responsavel is null ? NotFound() : Ok(responsavel);
     }
 
     [HttpPatch("{responsavelId:guid}/desativacao")]
+    [Authorize(Roles = PapeisSistema.Gestor)]
     [ProducesResponseType<ResponsavelContaDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -62,6 +64,7 @@ public sealed class ResponsaveisController(ISender sender) : ControllerBase
     }
 
     [HttpDelete("{responsavelId:guid}")]
+    [Authorize(Roles = PapeisSistema.Gestor)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -75,6 +78,7 @@ public sealed class ResponsaveisController(ISender sender) : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = PapeisSistema.Gestor)]
     [ProducesResponseType<ResponsavelContaDto>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]

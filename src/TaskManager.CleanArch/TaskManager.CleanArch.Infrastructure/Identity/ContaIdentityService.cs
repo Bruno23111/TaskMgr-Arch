@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using System.Data;
 using TaskManager.CleanArch.Application.Abstractions.Identity;
 using TaskManager.CleanArch.Application.Common;
@@ -66,6 +67,9 @@ public sealed class ContaIdentityService(
         if (responsavel is null)
             return null;
 
+        if (dados.Versao < 1 || responsavel.Versao != dados.Versao)
+            throw new ConflitoDeConcorrenciaException();
+
         var usuario = await userManager.FindByIdAsync(responsavel.UsuarioId);
         if (usuario is null)
             throw new InvalidOperationException("A conta do responsavel nao foi encontrada.");
@@ -93,7 +97,7 @@ public sealed class ContaIdentityService(
 
         var resultado = await userManager.UpdateAsync(usuario);
         if (!resultado.Succeeded)
-            throw new InvalidOperationException(string.Join(" ", resultado.Errors.Select(erro => erro.Description)));
+            LancarFalhaIdentity(resultado);
 
         if (papeisAtuais.Count > 0)
         {
@@ -106,7 +110,7 @@ public sealed class ContaIdentityService(
         if (!resultado.Succeeded)
             throw new InvalidOperationException(string.Join(" ", resultado.Errors.Select(erro => erro.Description)));
 
-        await context.SaveChangesAsync(cancellationToken);
+        await SalvarAlteracoesAsync(cancellationToken);
         await transacao.CommitAsync(cancellationToken);
 
         return await CriarResponsavelContaDtoAsync(responsavel, usuario, dados.Papel);
@@ -128,15 +132,15 @@ public sealed class ContaIdentityService(
 
         var resultado = await userManager.CreateAsync(usuario, dados.Senha);
         if (!resultado.Succeeded)
-            throw new InvalidOperationException(string.Join(" ", resultado.Errors.Select(erro => erro.Description)));
+            LancarFalhaIdentity(resultado);
 
         var papelAdicionado = await userManager.AddToRoleAsync(usuario, dados.Papel);
         if (!papelAdicionado.Succeeded)
-            throw new InvalidOperationException(string.Join(" ", papelAdicionado.Errors.Select(erro => erro.Description)));
+            LancarFalhaIdentity(papelAdicionado);
 
         var responsavel = Responsavel.Criar(usuario.Id, dados.Nome);
         context.Responsaveis.Add(responsavel);
-        await context.SaveChangesAsync(cancellationToken);
+        await SalvarAlteracoesAsync(cancellationToken);
         await transacao.CommitAsync(cancellationToken);
 
         return await CriarResponsavelContaDtoAsync(responsavel, usuario, dados.Papel);
@@ -185,9 +189,9 @@ public sealed class ContaIdentityService(
         usuario.Ativo = false;
         var resultado = await userManager.UpdateAsync(usuario);
         if (!resultado.Succeeded)
-            throw new InvalidOperationException(string.Join(" ", resultado.Errors.Select(erro => erro.Description)));
+            LancarFalhaIdentity(resultado);
 
-        await context.SaveChangesAsync(cancellationToken);
+        await SalvarAlteracoesAsync(cancellationToken);
         await transacao.CommitAsync(cancellationToken);
         return await CriarResponsavelContaDtoAsync(responsavel, usuario);
     }
@@ -235,9 +239,9 @@ public sealed class ContaIdentityService(
         context.Responsaveis.Remove(responsavel);
         var resultado = await userManager.DeleteAsync(usuario);
         if (!resultado.Succeeded)
-            throw new InvalidOperationException(string.Join(" ", resultado.Errors.Select(erro => erro.Description)));
+            LancarFalhaIdentity(resultado);
 
-        await context.SaveChangesAsync(cancellationToken);
+        await SalvarAlteracoesAsync(cancellationToken);
         await transacao.CommitAsync(cancellationToken);
         return true;
     }
@@ -261,7 +265,8 @@ public sealed class ContaIdentityService(
             responsavel.Nome,
             usuario.Email ?? string.Empty,
             papelDaConta,
-            responsavel.Ativo && usuario.Ativo);
+            responsavel.Ativo && usuario.Ativo,
+            responsavel.Versao);
     }
 
     private IQueryable<ResponsavelContaDto> CriarConsultaResponsaveisComPerfis(Guid? responsavelId = null) =>
@@ -279,7 +284,34 @@ public sealed class ContaIdentityService(
             responsavel.Nome,
             usuario.Email ?? string.Empty,
             papel.Name ?? string.Empty,
-            responsavel.Ativo && usuario.Ativo);
+            responsavel.Ativo && usuario.Ativo,
+            responsavel.Versao);
+
+    private async Task SalvarAlteracoesAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConflitoDeConcorrenciaException();
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.SerializationFailure })
+        {
+            throw new ConflitoDeConcorrenciaException();
+        }
+    }
+
+    private static void LancarFalhaIdentity(IdentityResult resultado)
+    {
+        if (resultado.Errors.Any(erro => erro.Code is "DuplicateEmail" or "DuplicateUserName"))
+            throw new ValorDuplicadoException("O e-mail já está em uso.");
+        if (resultado.Errors.Any(erro => erro.Code == "ConcurrencyFailure"))
+            throw new ConflitoDeConcorrenciaException();
+
+        throw new InvalidOperationException(string.Join(" ", resultado.Errors.Select(erro => erro.Description)));
+    }
 
     private static void ValidarDadosCadastro(CriarResponsavelConta dados)
     {
@@ -290,6 +322,7 @@ public sealed class ContaIdentityService(
 
         if (!PapeisSistema.Valido(dados.Papel))
             throw new ArgumentException("O papel deve ser Usuario ou Gestor.", nameof(dados));
+
     }
 
     private static void ValidarDadosAtualizacao(AtualizarResponsavelConta dados)
@@ -301,5 +334,8 @@ public sealed class ContaIdentityService(
 
         if (!PapeisSistema.Valido(dados.Papel))
             throw new ArgumentException("O papel deve ser Usuario ou Gestor.", nameof(dados));
+
+        if (dados.Versao < 1)
+            throw new ArgumentException("A versão deve ser maior que zero.", nameof(dados));
     }
 }

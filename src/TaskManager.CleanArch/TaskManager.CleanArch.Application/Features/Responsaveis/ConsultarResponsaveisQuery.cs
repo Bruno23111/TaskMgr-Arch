@@ -15,7 +15,7 @@ public sealed class ListarResponsaveisQueryHandler(
         ListarResponsaveisQuery request,
         CancellationToken cancellationToken)
     {
-        usuarioAtual.ExigirGestor();
+        usuarioAtual.ExigirAutenticado();
         return contas.ListarResponsaveisComPerfisAsync(cancellationToken);
     }
 }
@@ -30,7 +30,7 @@ public sealed class ObterResponsavelPorIdQueryHandler(
         ObterResponsavelPorIdQuery request,
         CancellationToken cancellationToken)
     {
-        usuarioAtual.ExigirGestor();
+        usuarioAtual.ExigirAutenticado();
         return contas.ObterResponsavelComPerfilAsync(request.Id, cancellationToken);
     }
 }

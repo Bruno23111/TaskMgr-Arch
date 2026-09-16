@@ -13,6 +13,7 @@ public sealed class ExcluirResponsavelCommandHandler(
     public Task<bool?> Handle(ExcluirResponsavelCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirGestor();
+        request.Versao.ExigirVersaoInformada();
         return contas.ExcluirResponsavelAsync(
             request.Id,
             request.Versao,
