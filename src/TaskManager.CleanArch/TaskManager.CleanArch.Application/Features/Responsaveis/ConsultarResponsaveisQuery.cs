@@ -1,5 +1,6 @@
 using MediatR;
 using TaskManager.CleanArch.Application.Abstractions.Identity;
+using TaskManager.CleanArch.Application.Abstractions.Persistence;
 using TaskManager.CleanArch.Application.Common;
 using TaskManager.CleanArch.Application.DTOs.Autenticacao;
 
@@ -9,14 +10,21 @@ public sealed record ListarResponsaveisQuery : IRequest<IReadOnlyList<Responsave
 
 public sealed class ListarResponsaveisQueryHandler(
     IContaIdentityService contas,
+    IResponsavelRepository responsaveis,
     IUsuarioAtual usuarioAtual) : IRequestHandler<ListarResponsaveisQuery, IReadOnlyList<ResponsavelContaDto>>
 {
-    public Task<IReadOnlyList<ResponsavelContaDto>> Handle(
+    public async Task<IReadOnlyList<ResponsavelContaDto>> Handle(
         ListarResponsaveisQuery request,
         CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirGestor();
-        return contas.ListarResponsaveisComPerfisAsync(cancellationToken);
+
+        var perfis = await responsaveis.ListarAsync(cancellationToken);
+        var contasPorUsuario = await contas.ObterContasAsync(perfis.Select(perfil => perfil.UsuarioId), cancellationToken);
+        return perfis
+            .Where(perfil => contasPorUsuario.TryGetValue(perfil.UsuarioId, out _))
+            .Select(perfil => perfil.ParaDto(contasPorUsuario[perfil.UsuarioId]))
+            .ToArray();
     }
 }
 
@@ -24,13 +32,22 @@ public sealed record ObterResponsavelPorIdQuery(Guid Id) : IRequest<ResponsavelC
 
 public sealed class ObterResponsavelPorIdQueryHandler(
     IContaIdentityService contas,
+    IResponsavelRepository responsaveis,
     IUsuarioAtual usuarioAtual) : IRequestHandler<ObterResponsavelPorIdQuery, ResponsavelContaDto?>
 {
-    public Task<ResponsavelContaDto?> Handle(
+    public async Task<ResponsavelContaDto?> Handle(
         ObterResponsavelPorIdQuery request,
         CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirGestor();
-        return contas.ObterResponsavelComPerfilAsync(request.Id, cancellationToken);
+
+        var perfil = await responsaveis.ObterPorIdAsync(request.Id, cancellationToken);
+        if (perfil is null)
+        {
+            return null;
+        }
+
+        var conta = await contas.ObterContaAsync(perfil.UsuarioId, cancellationToken);
+        return conta is null ? null : perfil.ParaDto(conta);
     }
 }
