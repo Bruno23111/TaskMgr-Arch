@@ -28,7 +28,7 @@ public sealed class StatusController(ISender sender) : ControllerBase
     [ProducesResponseType<StatusTarefaDto>(StatusCodes.Status201Created)]
     public async Task<ActionResult<StatusTarefaDto>> Criar(CriarStatusRequest request, CancellationToken cancellationToken)
     {
-        var status = await sender.Send(new CriarStatusCommand(request.Codigo, request.Nome, request.Categoria!.Value), cancellationToken);
+        var status = await sender.Send(new CriarStatusCommand(request.Codigo, request.Nome, request.Categoria), cancellationToken);
         return Created($"/status/{status.Id}", status);
     }
 
