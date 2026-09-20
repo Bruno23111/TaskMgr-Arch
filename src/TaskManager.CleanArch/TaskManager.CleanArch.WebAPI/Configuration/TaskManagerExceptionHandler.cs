@@ -5,13 +5,22 @@ using TaskManager.CleanArch.Domain.Common;
 
 namespace TaskManager.CleanArch.WebAPI.Configuration;
 
-public sealed class TaskManagerExceptionHandler(IProblemDetailsService problemDetailsService) : IExceptionHandler
+public sealed class TaskManagerExceptionHandler(
+    IProblemDetailsService problemDetailsService,
+    ILogger<TaskManagerExceptionHandler> logger) : IExceptionHandler
 {
     public ValueTask<bool> TryHandleAsync(
         HttpContext httpContext,
         Exception exception,
         CancellationToken cancellationToken)
     {
+        logger.LogError(
+            exception,
+            "Erro não tratado em {Method} {Path}. TraceId: {TraceId}",
+            httpContext.Request.Method,
+            httpContext.Request.Path,
+            httpContext.TraceIdentifier);
+
         var (statusCode, code, detail) = exception switch
         {
             TaskManager.CleanArch.Application.Common.ApplicationException applicationException => (ObterStatus(applicationException.Code), applicationException.Code, applicationException.Message),
