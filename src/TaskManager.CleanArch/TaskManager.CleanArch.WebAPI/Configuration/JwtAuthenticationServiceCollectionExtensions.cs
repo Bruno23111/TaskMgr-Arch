@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using TaskManager.CleanArch.Application.Abstractions.Identity;
@@ -36,7 +37,14 @@ public static class JwtAuthenticationServiceCollectionExtensions
 
                 options.Events = new JwtBearerEvents
                 {
-                    OnTokenValidated = AtualizarContaEPerfisAsync
+                    OnTokenValidated = AtualizarContaEPerfisAsync,
+                    OnChallenge = context =>
+                    {
+                        context.HandleResponse();
+                        return WriteProblemAsync(context.HttpContext, 401, "NAO_AUTENTICADO", "Não autenticado.");
+                    },
+                    OnForbidden = context =>
+                        WriteProblemAsync(context.HttpContext, 403, "ACESSO_NEGADO", "Acesso negado.")
                 };
             });
 
@@ -67,5 +75,29 @@ public static class JwtAuthenticationServiceCollectionExtensions
 
         foreach (var papel in conta.Papeis)
             identidade.AddClaim(new Claim(ClaimTypes.Role, papel));
+    }
+
+    private static async Task WriteProblemAsync(
+        HttpContext context,
+        int status,
+        string code,
+        string title)
+    {
+        if (context.Response.HasStarted)
+        {
+            return;
+        }
+
+        context.Response.StatusCode = status;
+        context.Response.ContentType = "application/problem+json";
+        await JsonSerializer.SerializeAsync(context.Response.Body, new
+        {
+            type = $"https://httpstatuses.com/{status}",
+            title,
+            status,
+            detail = title,
+            instance = context.Request.Path.Value,
+            code
+        });
     }
 }

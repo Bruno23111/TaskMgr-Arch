@@ -70,7 +70,9 @@ public sealed class TaskService(TaskManagerMvcDbContext dbContext, CurrentUser c
         CancellationToken cancellationToken = default)
     {
         EnsureManager();
+        RequestValidation.RequiredId(request.ProjetoId, "projetoId");
         var title = NormalizeTitle(request.Titulo);
+        var description = NormalizeDescription(request.Descricao);
         await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var project = await dbContext.ProjetoAsync(request.ProjetoId, cancellationToken);
         if (project is null || project.ExcluidoEm is not null)
@@ -87,7 +89,7 @@ public sealed class TaskService(TaskManagerMvcDbContext dbContext, CurrentUser c
             ProjetoId = project.Id,
             StatusId = initialStatusId,
             Titulo = title,
-            Descricao = NormalizeDescription(request.Descricao)
+            Descricao = description
         };
         dbContext.Tarefas.Add(task);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -100,13 +102,16 @@ public sealed class TaskService(TaskManagerMvcDbContext dbContext, CurrentUser c
         TaskUpdateRequest request,
         CancellationToken cancellationToken = default)
     {
+        RequestValidation.Version(request.Versao);
+        var title = NormalizeTitle(request.Titulo);
+        var description = NormalizeDescription(request.Descricao);
         var task = await FindAsync(taskId, cancellationToken);
         await EnsureCanEditAsync(task, cancellationToken);
         EnsureVersion(task, request.Versao);
         await EnsureNotCompletedAsync(task.StatusId, cancellationToken);
 
-        task.Titulo = NormalizeTitle(request.Titulo);
-        task.Descricao = NormalizeDescription(request.Descricao);
+        task.Titulo = title;
+        task.Descricao = description;
         dbContext.Entry(task).State = EntityState.Modified;
         await dbContext.SaveChangesAsync(cancellationToken);
         return ToResponse(task);
@@ -133,14 +138,16 @@ public sealed class TaskService(TaskManagerMvcDbContext dbContext, CurrentUser c
         CancellationToken cancellationToken = default)
     {
         EnsureManager();
+        RequestValidation.Version(request.Versao);
+        RequestValidation.RequiredId(request.ResponsavelId, "responsavelId");
         await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var task = await FindAsync(taskId, cancellationToken);
         var responsible = await dbContext.ResponsavelAsync(request.ResponsavelId, cancellationToken);
         if (responsible is null)
         {
             throw InvalidData("O responsável informado não existe.");
         }
 
-        var task = await FindAsync(taskId, cancellationToken);
         EnsureVersion(task, request.Versao);
         await EnsureNotCompletedAsync(task.StatusId, cancellationToken);
 
@@ -183,7 +190,10 @@ public sealed class TaskService(TaskManagerMvcDbContext dbContext, CurrentUser c
         ChangeTaskStatusRequest request,
         CancellationToken cancellationToken = default)
     {
+        RequestValidation.Version(request.Versao);
+        RequestValidation.RequiredId(request.StatusId, "statusId");
         await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var task = await FindAsync(taskId, cancellationToken);
         var targetStatus = await dbContext.Statuses.SingleOrDefaultAsync(
             status => status.Id == request.StatusId,
             cancellationToken);
@@ -192,7 +202,6 @@ public sealed class TaskService(TaskManagerMvcDbContext dbContext, CurrentUser c
             throw InvalidData("O status informado não existe.");
         }
 
-        var task = await FindAsync(taskId, cancellationToken);
         await EnsureCanEditAsync(task, cancellationToken);
         EnsureVersion(task, request.Versao);
 
@@ -300,18 +309,11 @@ public sealed class TaskService(TaskManagerMvcDbContext dbContext, CurrentUser c
         }
     }
 
-    private static string NormalizeTitle(string title)
-    {
-        var normalized = title.Trim();
-        if (normalized.Length == 0)
-        {
-            throw InvalidData("O título da tarefa é obrigatório.");
-        }
-        return normalized;
-    }
+    private static string NormalizeTitle(string? title) =>
+        RequestValidation.RequiredText(title, "titulo", 100);
 
     private static string? NormalizeDescription(string? description) =>
-        string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        RequestValidation.OptionalText(description, "descricao", 255);
 
     private static void ValidatePagination(int page, int size)
     {

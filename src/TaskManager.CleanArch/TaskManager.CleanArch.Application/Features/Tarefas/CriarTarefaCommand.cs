@@ -19,6 +19,9 @@ public sealed class CriarTarefaCommandHandler(
     public async Task<TarefaDto> Handle(CriarTarefaCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirGestor();
+        RequestValidator.ExigirIdInformado(request.ProjetoId, "projetoId");
+        var titulo = RequestValidator.ExigirTexto(request.Titulo, "titulo", 100);
+        var descricao = RequestValidator.ValidarTextoOpcional(request.Descricao, "descricao", 255);
         return await unidadeDeTrabalho.ExecutarEmTransacaoSerializavelAsync(async token =>
         {
             if (!await projetos.BloquearParaAtualizacaoAsync(request.ProjetoId, token))
@@ -27,7 +30,7 @@ public sealed class CriarTarefaCommandHandler(
             var statusInicial = await status.ObterPendenteInicialAsync(token)
                 ?? throw new InvalidOperationException("O status inicial pendente não está configurado.");
 
-            var tarefa = Tarefa.Criar(request.ProjetoId, request.Titulo, request.Descricao, statusInicial.Id);
+            var tarefa = Tarefa.Criar(request.ProjetoId, titulo, descricao, statusInicial.Id);
             tarefas.Adicionar(tarefa);
             await unidadeDeTrabalho.SalvarAlteracoesAsync(token);
             return tarefa.ParaDto();

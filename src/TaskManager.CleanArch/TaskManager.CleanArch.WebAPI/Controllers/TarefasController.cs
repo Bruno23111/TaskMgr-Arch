@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using TaskManager.CleanArch.Application.DTOs;
 using TaskManager.CleanArch.Application.DTOs.Paginacao;
 using TaskManager.CleanArch.Application.Features.Tarefas;
+using TaskManager.CleanArch.Application.Common;
 using TaskManager.CleanArch.WebAPI.Contracts.Requests;
 
 namespace TaskManager.CleanArch.WebAPI.Controllers;
@@ -31,6 +32,7 @@ public sealed class TarefasController(ISender sender) : ControllerBase
         => Ok(await sender.Send(new ObterTarefaQuery(tarefaId), cancellationToken));
 
     [HttpPost]
+    [Authorize(Roles = PapeisSistema.Gestor)]
     [ProducesResponseType<TarefaDto>(StatusCodes.Status201Created)]
     public async Task<ActionResult<TarefaDto>> Criar(
         CriarTarefaRequest request,
@@ -67,6 +69,7 @@ public sealed class TarefasController(ISender sender) : ControllerBase
     }
 
     [HttpPut("{tarefaId:guid}/responsavel")]
+    [Authorize(Roles = PapeisSistema.Gestor)]
     [ProducesResponseType<TarefaDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<TarefaDto>> AtribuirResponsavel(
         Guid tarefaId,
@@ -75,6 +78,7 @@ public sealed class TarefasController(ISender sender) : ControllerBase
         => Ok(await sender.Send(new AtribuirResponsavelTarefaCommand(tarefaId, request.ResponsavelId, request.Versao), cancellationToken));
 
     [HttpDelete("{tarefaId:guid}/responsavel")]
+    [Authorize(Roles = PapeisSistema.Gestor)]
     [ProducesResponseType<TarefaDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<TarefaDto>> RemoverResponsavel(
         Guid tarefaId,
@@ -83,6 +87,7 @@ public sealed class TarefasController(ISender sender) : ControllerBase
         => Ok(await sender.Send(new RemoverResponsavelTarefaCommand(tarefaId, versao), cancellationToken));
 
     [HttpDelete("{tarefaId:guid}")]
+    [Authorize(Roles = PapeisSistema.Gestor)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Excluir(
         Guid tarefaId,

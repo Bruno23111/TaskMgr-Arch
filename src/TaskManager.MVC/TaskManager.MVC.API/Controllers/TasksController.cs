@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TaskManager.MVC.API.Configuration;
@@ -15,8 +14,8 @@ public sealed class TasksController(TaskService service) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PageResponse<TaskResponse>>> Listar(
-        [FromQuery, Range(1, int.MaxValue)] int pagina = 1,
-        [FromQuery, Range(1, 100)] int tamanho = 20,
+        [FromQuery] int pagina = 1,
+        [FromQuery] int tamanho = 20,
         [FromQuery] Guid? projetoId = null,
         CancellationToken cancellationToken = default) =>
         Ok(await service.ListarAsync(pagina, tamanho, projetoId, cancellationToken));
@@ -33,6 +32,7 @@ public sealed class TasksController(TaskService service) : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Gestor")]
     public async Task<ActionResult<TaskResponse>> Criar(
         TaskCreateRequest request,
         CancellationToken cancellationToken)
@@ -49,6 +49,7 @@ public sealed class TasksController(TaskService service) : ControllerBase
         Ok(await service.AtualizarAsync(tarefaId, request, cancellationToken));
 
     [HttpDelete("{tarefaId:guid}")]
+    [Authorize(Roles = "Gestor")]
     public async Task<IActionResult> Excluir(
         Guid tarefaId,
         [FromQuery] int versao,
@@ -59,6 +60,7 @@ public sealed class TasksController(TaskService service) : ControllerBase
     }
 
     [HttpPut("{tarefaId:guid}/responsavel")]
+    [Authorize(Roles = "Gestor")]
     public async Task<ActionResult<TaskResponse>> AtribuirResponsavel(
         Guid tarefaId,
         AssignResponsibleRequest request,
@@ -66,6 +68,7 @@ public sealed class TasksController(TaskService service) : ControllerBase
         Ok(await service.AtribuirResponsavelAsync(tarefaId, request, cancellationToken));
 
     [HttpDelete("{tarefaId:guid}/responsavel")]
+    [Authorize(Roles = "Gestor")]
     public async Task<ActionResult<TaskResponse>> RemoverResponsavel(
         Guid tarefaId,
         [FromQuery] int versao,

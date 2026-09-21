@@ -63,7 +63,7 @@ paths:
     get:
       summary: Listar tarefas
       operationId: listarTarefas
-      parameters: [ { $ref: '#/components/parameters/Pagina' }, { $ref: '#/components/parameters/Tamanho' }, { name: projetoId, in: query, schema: { type: string, format: uuid } } ]
+      parameters: [ { $ref: '#/components/parameters/Pagina' }, { $ref: '#/components/parameters/Tamanho' }, { name: projetoId, in: query, description: Projeto inexistente retorna 400 DADOS_INVALIDOS., schema: { type: string, format: uuid } } ]
       responses: { '200': { description: Página de tarefas, content: { application/json: { schema: { $ref: '#/components/schemas/PaginaTarefa' } } } }, '400': { $ref: '#/components/responses/DadosInvalidos' }, '401': { $ref: '#/components/responses/NaoAutenticado' } }
     post:
       summary: Criar tarefa

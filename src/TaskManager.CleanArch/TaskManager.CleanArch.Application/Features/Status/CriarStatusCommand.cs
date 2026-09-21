@@ -18,10 +18,12 @@ public sealed class CriarStatusCommandHandler(
     public async Task<StatusTarefaDto> Handle(CriarStatusCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirGestor();
+        var codigo = RequestValidator.ExigirTexto(request.Codigo, "codigo", 20);
+        var nome = RequestValidator.ExigirTexto(request.Nome, "nome", 60);
         if (request.Categoria is null)
             throw new ArgumentException("A categoria do status é obrigatória.", nameof(request.Categoria));
 
-        var statusTarefa = StatusTarefa.Criar(request.Codigo, request.Nome, request.Categoria.Value);
+        var statusTarefa = StatusTarefa.Criar(codigo, nome, request.Categoria.Value);
         if (await status.CodigoEmUsoAsync(statusTarefa.Codigo, cancellationToken: cancellationToken))
             throw new ValorDuplicadoException("O código do status já está em uso.");
 

@@ -48,7 +48,8 @@ public sealed class ProjectService(TaskManagerMvcDbContext dbContext, CurrentUse
     {
         EnsureManager();
         var name = NormalizeName(request.Nome);
-        var project = new Projeto { Nome = name, Descricao = NormalizeDescription(request.Descricao) };
+        var description = NormalizeDescription(request.Descricao);
+        var project = new Projeto { Nome = name, Descricao = description };
         dbContext.Projetos.Add(project);
         await dbContext.SaveChangesAsync(cancellationToken);
         return ToResponse(project);
@@ -60,10 +61,13 @@ public sealed class ProjectService(TaskManagerMvcDbContext dbContext, CurrentUse
         CancellationToken cancellationToken = default)
     {
         EnsureManager();
+        RequestValidation.Version(request.Versao);
+        var name = NormalizeName(request.Nome);
+        var description = NormalizeDescription(request.Descricao);
         var project = await FindAsync(projectId, cancellationToken);
         EnsureVersion(project, request.Versao);
-        project.Nome = NormalizeName(request.Nome);
-        project.Descricao = NormalizeDescription(request.Descricao);
+        project.Nome = name;
+        project.Descricao = description;
         dbContext.Entry(project).State = EntityState.Modified;
         await dbContext.SaveChangesAsync(cancellationToken);
         return ToResponse(project);
@@ -128,19 +132,11 @@ public sealed class ProjectService(TaskManagerMvcDbContext dbContext, CurrentUse
         }
     }
 
-    private static string NormalizeName(string name)
-    {
-        var normalized = name.Trim();
-        if (normalized.Length == 0)
-        {
-            throw InvalidData("O nome do projeto é obrigatório.");
-        }
-
-        return normalized;
-    }
+    private static string NormalizeName(string? name) =>
+        RequestValidation.RequiredText(name, "nome", 100);
 
     private static string? NormalizeDescription(string? description) =>
-        string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        RequestValidation.OptionalText(description, "descricao", 255);
 
     private static ProjectResponse ToResponse(Projeto project) =>
         new(project.Id, project.Nome, project.Descricao, project.Versao);

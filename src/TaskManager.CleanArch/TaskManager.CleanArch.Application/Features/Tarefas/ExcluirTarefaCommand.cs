@@ -19,7 +19,7 @@ public sealed class ExcluirTarefaCommandHandler(
     public async Task Handle(ExcluirTarefaCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirGestor();
-        request.Versao.ExigirVersaoInformada();
+        RequestValidator.ExigirVersaoInformada(request.Versao);
         await unidadeDeTrabalho.ExecutarEmTransacaoAsync(async token =>
         {
             var tarefa = await tarefas.ObterPorIdAsync(request.TarefaId, token)
@@ -27,7 +27,7 @@ public sealed class ExcluirTarefaCommandHandler(
             if (!await projetos.BloquearParaAtualizacaoAsync(tarefa.ProjetoId, token))
                 throw new RecursoNaoEncontradoException("Projeto");
 
-            tarefa.Versao.ExigirVersao(request.Versao);
+            RequestValidator.ExigirVersaoAtual(tarefa.Versao, request.Versao);
             var statusAtual = await status.ObterPorIdAsync(tarefa.StatusId, token)
                 ?? throw new RecursoNaoEncontradoException("Status da tarefa");
             tarefa.Excluir(statusAtual.Categoria, relogio.DataHoraAgoraUTC);

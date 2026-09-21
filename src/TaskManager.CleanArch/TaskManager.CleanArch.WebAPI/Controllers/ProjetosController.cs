@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using TaskManager.CleanArch.Application.DTOs;
 using TaskManager.CleanArch.Application.DTOs.Paginacao;
 using TaskManager.CleanArch.Application.Features.Projetos;
+using TaskManager.CleanArch.Application.Common;
 using TaskManager.CleanArch.WebAPI.Contracts.Requests;
 
 namespace TaskManager.CleanArch.WebAPI.Controllers;
@@ -25,6 +26,7 @@ public sealed class ProjetosController(ISender sender) : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = PapeisSistema.Gestor)]
     [ProducesResponseType<ProjetoDto>(StatusCodes.Status201Created)]
     public async Task<ActionResult<ProjetoDto>> Criar(
         CriarProjetoRequest request,
@@ -40,11 +42,13 @@ public sealed class ProjetosController(ISender sender) : ControllerBase
         => Ok(await sender.Send(new ObterProjetoQuery(projetoId), cancellationToken));
 
     [HttpPut("{projetoId:guid}")]
+    [Authorize(Roles = PapeisSistema.Gestor)]
     [ProducesResponseType<ProjetoDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<ProjetoDto>> Atualizar(Guid projetoId, AtualizarProjetoRequest request, CancellationToken cancellationToken)
         => Ok(await sender.Send(new AtualizarProjetoCommand(projetoId, request.Nome, request.Descricao, request.Versao), cancellationToken));
 
     [HttpDelete("{projetoId:guid}")]
+    [Authorize(Roles = PapeisSistema.Gestor)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Excluir(
         Guid projetoId,

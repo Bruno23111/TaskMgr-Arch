@@ -14,7 +14,9 @@ public sealed class LoginCommandHandler(
 {
     public async Task<TokenAcesso> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
-        var conta = await contas.AutenticarAsync(request.Email, request.Senha, cancellationToken)
+        var email = RequestValidator.ExigirEmail(request.Email);
+        var senha = RequestValidator.ExigirValor(request.Senha, "senha");
+        var conta = await contas.AutenticarAsync(email, senha, cancellationToken)
             ?? throw new CredenciaisInvalidasException();
 
         return tokens.Gerar(new DadosUsuarioToken(conta.UsuarioId, conta.Email, conta.Papeis));

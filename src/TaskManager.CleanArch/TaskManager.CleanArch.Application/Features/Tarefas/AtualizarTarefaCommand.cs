@@ -18,7 +18,9 @@ public sealed class AtualizarTarefaCommandHandler(
     public async Task<TarefaDto> Handle(AtualizarTarefaCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirAutenticado();
-        request.Versao.ExigirVersaoInformada();
+        RequestValidator.ExigirVersaoInformada(request.Versao);
+        var titulo = RequestValidator.ExigirTexto(request.Titulo, "titulo", 100);
+        var descricao = RequestValidator.ValidarTextoOpcional(request.Descricao, "descricao", 255);
 
         var tarefa = await tarefas.ObterPorIdAsync(request.TarefaId, cancellationToken)
             ?? throw new RecursoNaoEncontradoException("Tarefa");
@@ -33,8 +35,8 @@ public sealed class AtualizarTarefaCommandHandler(
                 throw new AcessoNegadoException();
         }
 
-        tarefa.Versao.ExigirVersao(request.Versao);
-        tarefa.AtualizarConteudo(request.Titulo, request.Descricao, statusAtual.Categoria);
+        RequestValidator.ExigirVersaoAtual(tarefa.Versao, request.Versao);
+        tarefa.AtualizarConteudo(titulo, descricao, statusAtual.Categoria);
         await unidadeDeTrabalho.SalvarAlteracoesAsync(cancellationToken);
         return tarefa.ParaDto();
     }

@@ -34,6 +34,7 @@ public static class ProblemDetailsConfig
                 {
                     Status = StatusCodes.Status400BadRequest,
                     Title = "Dados inválidos.",
+                    Detail = "Um ou mais campos são inválidos.",
                     Type = "https://httpstatuses.com/400",
                     Instance = context.HttpContext.Request.Path
                 };

@@ -15,8 +15,9 @@ public sealed class CriarProjetoCommandHandler(IProjetoRepository projetos, IUni
     public async Task<ProjetoDto> Handle(CriarProjetoCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirGestor();
-        
-        var projeto = Projeto.Criar(request.Nome, request.Descricao);
+        var nome = RequestValidator.ExigirTexto(request.Nome, "nome", 100);
+        var descricao = RequestValidator.ValidarTextoOpcional(request.Descricao, "descricao", 255);
+        var projeto = Projeto.Criar(nome, descricao);
 
         projetos.Adicionar(projeto);
 

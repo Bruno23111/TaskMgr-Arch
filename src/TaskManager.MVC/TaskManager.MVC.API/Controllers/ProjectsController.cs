@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TaskManager.MVC.API.Configuration;
@@ -15,8 +14,8 @@ public sealed class ProjectsController(ProjectService service) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PageResponse<ProjectResponse>>> Listar(
-        [FromQuery, Range(1, int.MaxValue)] int pagina = 1,
-        [FromQuery, Range(1, 100)] int tamanho = 20,
+        [FromQuery] int pagina = 1,
+        [FromQuery] int tamanho = 20,
         CancellationToken cancellationToken = default) =>
         Ok(await service.ListarAsync(pagina, tamanho, cancellationToken));
 
@@ -33,6 +32,7 @@ public sealed class ProjectsController(ProjectService service) : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Gestor")]
     public async Task<ActionResult<ProjectResponse>> Criar(
         ProjectCreateRequest request,
         CancellationToken cancellationToken)
@@ -42,6 +42,7 @@ public sealed class ProjectsController(ProjectService service) : ControllerBase
     }
 
     [HttpPut("{projetoId:guid}")]
+    [Authorize(Roles = "Gestor")]
     public async Task<ActionResult<ProjectResponse>> Atualizar(
         Guid projetoId,
         ProjectUpdateRequest request,
@@ -49,6 +50,7 @@ public sealed class ProjectsController(ProjectService service) : ControllerBase
         Ok(await service.AtualizarAsync(projetoId, request, cancellationToken));
 
     [HttpDelete("{projetoId:guid}")]
+    [Authorize(Roles = "Gestor")]
     public async Task<IActionResult> Excluir(
         Guid projetoId,
         [FromQuery] int versao,

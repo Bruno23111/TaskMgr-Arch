@@ -19,9 +19,8 @@ public sealed class AtribuirResponsavelTarefaCommandHandler(
     public async Task<TarefaDto> Handle(AtribuirResponsavelTarefaCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirGestor();
-        request.Versao.ExigirVersaoInformada();
-        if (request.ResponsavelId == Guid.Empty)
-            throw new ArgumentException("O responsável é obrigatório.", nameof(request.ResponsavelId));
+        RequestValidator.ExigirVersaoInformada(request.Versao);
+        RequestValidator.ExigirIdInformado(request.ResponsavelId, "responsavelId");
 
         return await unidadeDeTrabalho.ExecutarEmTransacaoSerializavelAsync(async token =>
         {
@@ -30,7 +29,7 @@ public sealed class AtribuirResponsavelTarefaCommandHandler(
             if (!await projetos.BloquearParaAtualizacaoAsync(tarefa.ProjetoId, token))
                 throw new RecursoNaoEncontradoException("Projeto");
 
-            tarefa.Versao.ExigirVersao(request.Versao);
+            RequestValidator.ExigirVersaoAtual(tarefa.Versao, request.Versao);
             var statusAtual = await status.ObterPorIdAsync(tarefa.StatusId, token)
                 ?? throw new RecursoNaoEncontradoException("Status da tarefa");
             if (!await responsaveis.BloquearParaAtualizacaoAsync(request.ResponsavelId, token))

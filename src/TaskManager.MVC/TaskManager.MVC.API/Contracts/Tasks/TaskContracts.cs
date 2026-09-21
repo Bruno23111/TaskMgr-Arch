@@ -1,24 +1,22 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace TaskManager.MVC.API.Contracts.Tasks;
 
 public sealed record TaskCreateRequest(
     Guid ProjetoId,
-    [Required, MaxLength(100)] string Titulo,
-    [MaxLength(255)] string? Descricao);
+    string Titulo,
+    string? Descricao);
 
 public sealed record TaskUpdateRequest(
-    [Required, MaxLength(100)] string Titulo,
-    [MaxLength(255)] string? Descricao,
-    [Range(1, int.MaxValue)] int Versao);
+    string Titulo,
+    string? Descricao,
+    int Versao);
 
 public sealed record AssignResponsibleRequest(
     Guid ResponsavelId,
-    [Range(1, int.MaxValue)] int Versao);
+    int Versao);
 
 public sealed record ChangeTaskStatusRequest(
     Guid StatusId,
-    [Range(1, int.MaxValue)] int Versao);
+    int Versao);
 
 public sealed record TaskResponse(
     Guid Id,

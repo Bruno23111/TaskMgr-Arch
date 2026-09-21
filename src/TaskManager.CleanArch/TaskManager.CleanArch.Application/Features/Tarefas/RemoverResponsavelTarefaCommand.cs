@@ -18,7 +18,7 @@ public sealed class RemoverResponsavelTarefaCommandHandler(
     public async Task<TarefaDto> Handle(RemoverResponsavelTarefaCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirGestor();
-        request.Versao.ExigirVersaoInformada();
+        RequestValidator.ExigirVersaoInformada(request.Versao);
         return await unidadeDeTrabalho.ExecutarEmTransacaoAsync(async token =>
         {
             var tarefa = await tarefas.ObterPorIdAsync(request.TarefaId, token)
@@ -26,7 +26,7 @@ public sealed class RemoverResponsavelTarefaCommandHandler(
             if (!await projetos.BloquearParaAtualizacaoAsync(tarefa.ProjetoId, token))
                 throw new RecursoNaoEncontradoException("Projeto");
 
-            tarefa.Versao.ExigirVersao(request.Versao);
+            RequestValidator.ExigirVersaoAtual(tarefa.Versao, request.Versao);
             var statusAtual = await status.ObterPorIdAsync(tarefa.StatusId, token)
                 ?? throw new RecursoNaoEncontradoException("Status da tarefa");
             tarefa.RemoverResponsavel(statusAtual.Categoria);

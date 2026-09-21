@@ -23,16 +23,15 @@ public sealed class CriarResponsavelCommandHandler(
     {
         usuarioAtual.ExigirGestor();
         PapeisSistema.Validar(request.Papel);
-        if (string.IsNullOrWhiteSpace(request.Nome))
-        {
-            throw new ArgumentException("O nome é obrigatório.", nameof(request.Nome));
-        }
+        var nome = RequestValidator.ExigirTexto(request.Nome, "nome", 100);
+        var email = RequestValidator.ExigirEmail(request.Email);
+        var senha = RequestValidator.ExigirValor(request.Senha, "senha");
 
         return unidadeDeTrabalho.ExecutarEmTransacaoSerializavelAsync(async token =>
         {
             var conta = await contas.CriarContaAsync(
-                new CriarContaIdentity(request.Email, request.Senha, request.Papel), token);
-            var responsavel = Responsavel.Criar(conta.UsuarioId, request.Nome.Trim());
+                new CriarContaIdentity(email, senha, request.Papel), token);
+            var responsavel = Responsavel.Criar(conta.UsuarioId, nome);
 
             responsaveis.Adicionar(responsavel);
             await unidadeDeTrabalho.SalvarAlteracoesAsync(token);

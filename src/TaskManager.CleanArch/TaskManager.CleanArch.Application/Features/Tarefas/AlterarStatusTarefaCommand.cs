@@ -5,6 +5,7 @@ using TaskManager.CleanArch.Application.Abstractions.Services;
 using TaskManager.CleanArch.Application.Common;
 using TaskManager.CleanArch.Application.DTOs;
 using TaskManager.CleanArch.Domain.Common;
+using TaskManager.CleanArch.Domain.Enums;
 
 namespace TaskManager.CleanArch.Application.Features.Tarefas;
 
@@ -23,9 +24,8 @@ public sealed class AlterarStatusTarefaCommandHandler(
     public async Task<TarefaDto> Handle(AlterarStatusTarefaCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirAutenticado();
-        request.Versao.ExigirVersaoInformada();
-        if (request.StatusId == Guid.Empty)
-            throw new ArgumentException("O status é obrigatório.", nameof(request.StatusId));
+        RequestValidator.ExigirVersaoInformada(request.Versao);
+        RequestValidator.ExigirIdInformado(request.StatusId, "statusId");
 
         IReadOnlyCollection<IDomainEvent> eventos = [];
         var resultado = await unidadeDeTrabalho.ExecutarEmTransacaoSerializavelAsync(async token =>
@@ -45,9 +45,15 @@ public sealed class AlterarStatusTarefaCommandHandler(
                 var responsavelAtual = await responsaveis.ObterPorUsuarioIdAsync(usuarioAtual.UsuarioId, token);
                 if (responsavelAtual?.Id != tarefa.ResponsavelId)
                     throw new AcessoNegadoException();
+
+                if (statusAtual.Categoria == CategoriaStatus.Concluida &&
+                    novoStatus.Categoria == CategoriaStatus.Pendente)
+                {
+                    throw new AcessoNegadoException();
+                }
             }
 
-            tarefa.Versao.ExigirVersao(request.Versao);
+            RequestValidator.ExigirVersaoAtual(tarefa.Versao, request.Versao);
             var responsavelDaTarefa = tarefa.ResponsavelId is { } responsavelId
                 ? await responsaveis.ObterPorIdAsync(responsavelId, token)
                 : null;

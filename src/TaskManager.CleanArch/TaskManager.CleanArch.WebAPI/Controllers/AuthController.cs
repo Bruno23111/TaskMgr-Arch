@@ -1,7 +1,6 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using TaskManager.CleanArch.Application.Common;
 using TaskManager.CleanArch.Application.Features.Autenticacao;
 using TaskManager.CleanArch.WebAPI.Contracts.Requests;
 using TaskManager.CleanArch.WebAPI.Contracts.Responses;
@@ -18,14 +17,7 @@ public sealed class AuthController(ISender sender) : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<LoginResponse>> Login(LoginRequest request, CancellationToken cancellationToken)
     {
-        try
-        {
-            var token = await sender.Send(new LoginCommand(request.Email, request.Senha), cancellationToken);
-            return Ok(new LoginResponse(token.Valor, token.ExpiraEm));
-        }
-        catch (CredenciaisInvalidasException)
-        {
-            return Unauthorized();
-        }
+        var token = await sender.Send(new LoginCommand(request.Email, request.Senha), cancellationToken);
+        return Ok(new LoginResponse(token.Valor, token.ExpiraEm));
     }
 }

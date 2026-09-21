@@ -45,13 +45,16 @@ public sealed class AccountService(
         CancellationToken cancellationToken = default)
     {
         EnsureRole(papel);
+        var normalizedName = RequestValidation.RequiredText(nome, "nome", 100);
+        var normalizedEmail = RequestValidation.Email(email);
+        RequestValidation.RequiredValue(senha, "senha");
         await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
-        var usuario = new UsuarioIdentity { UserName = email.Trim(), Email = email.Trim(), Ativo = true };
+        var usuario = new UsuarioIdentity { UserName = normalizedEmail, Email = normalizedEmail, Ativo = true };
         EnsureIdentityResult(await userManager.CreateAsync(usuario, senha));
         EnsureIdentityResult(await userManager.AddToRoleAsync(usuario, papel));
 
-        var responsavel = new Responsavel { UsuarioId = usuario.Id, Nome = nome.Trim() };
+        var responsavel = new Responsavel { UsuarioId = usuario.Id, Nome = normalizedName };
         dbContext.Responsaveis.Add(responsavel);
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -65,6 +68,9 @@ public sealed class AccountService(
         CancellationToken cancellationToken = default)
     {
         EnsureRole(request.Papel);
+        RequestValidation.Version(request.Versao);
+        var normalizedName = RequestValidation.RequiredText(request.Nome, "nome", 100);
+        var normalizedEmail = RequestValidation.Email(request.Email);
         await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var responsible = await dbContext.ResponsavelAsync(responsavelId, cancellationToken) ?? throw NotFound();
         EnsureVersion(responsible, request.Versao);
@@ -77,9 +83,6 @@ public sealed class AccountService(
             await EnsureCanDemoteManagerAsync(user);
         }
 
-        var normalizedName = request.Nome.Trim();
-        if (normalizedName.Length == 0) throw InvalidData("O nome é obrigatório.");
-        var normalizedEmail = request.Email.Trim();
         var changed = responsible.Nome != normalizedName
             || !string.Equals(user.Email, normalizedEmail, StringComparison.OrdinalIgnoreCase)
             || !currentRoles.Contains(request.Papel);
@@ -108,6 +111,7 @@ public sealed class AccountService(
         string usuarioAtualId,
         CancellationToken cancellationToken = default)
     {
+        RequestValidation.Version(versao);
         await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var responsavel = await dbContext.ResponsavelAsync(responsavelId, cancellationToken)
             ?? throw NotFound();
@@ -169,6 +173,11 @@ public sealed class AccountService(
         string usuarioAtualId,
         CancellationToken cancellationToken = default)
     {
+        if (versao < 1)
+        {
+            throw InvalidData("A versão deve ser maior que zero.");
+        }
+
         await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var responsavel = await dbContext.ResponsavelAsync(responsavelId, cancellationToken)
             ?? throw NotFound();
