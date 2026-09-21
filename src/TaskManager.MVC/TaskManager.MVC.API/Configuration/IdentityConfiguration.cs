@@ -25,7 +25,6 @@ public static class IdentityConfiguration
         }
 
         services.Configure<JwtOptions>(configuration.GetRequiredSection(JwtOptions.SectionName));
-        services.Configure<InitialManagerOptions>(configuration.GetSection(InitialManagerOptions.SectionName));
         services.AddIdentityCore<UsuarioIdentity>(options =>
             {
                 options.User.RequireUniqueEmail = true;
@@ -59,8 +58,6 @@ public static class IdentityConfiguration
         services.AddAuthorization();
         services.AddScoped<TokenService>();
         services.AddScoped<AuthenticationService>();
-        services.AddScoped<AccountService>();
-        services.AddHostedService<IdentityBootstrapper>();
         return services;
     }
 
