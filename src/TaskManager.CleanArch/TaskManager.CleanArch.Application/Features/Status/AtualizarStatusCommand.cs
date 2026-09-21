@@ -16,11 +16,12 @@ public sealed class AtualizarStatusCommandHandler(
     public async Task<StatusTarefaDto> Handle(AtualizarStatusCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirGestor();
-        request.Versao.ExigirVersaoInformada();
+        RequestValidator.ExigirVersaoInformada(request.Versao);
+        var nome = RequestValidator.ExigirTexto(request.Nome, "nome", 60);
         var statusTarefa = await status.ObterPorIdAsync(request.StatusId, cancellationToken)
             ?? throw new RecursoNaoEncontradoException("Status");
-        statusTarefa.Versao.ExigirVersao(request.Versao);
-        statusTarefa.Renomear(request.Nome);
+        RequestValidator.ExigirVersaoAtual(statusTarefa.Versao, request.Versao);
+        statusTarefa.Renomear(nome);
         await unidadeDeTrabalho.SalvarAlteracoesAsync(cancellationToken);
         return statusTarefa.ParaDto();
     }

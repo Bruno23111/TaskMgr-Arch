@@ -12,7 +12,9 @@ public sealed class AuthenticationService(
         LoginRequest request,
         CancellationToken cancellationToken = default)
     {
-        var usuario = await userManager.FindByEmailAsync(request.Email.Trim());
+        var email = RequestValidation.Email(request.Email);
+        RequestValidation.RequiredValue(request.Senha, "senha");
+        var usuario = await userManager.FindByEmailAsync(email);
         cancellationToken.ThrowIfCancellationRequested();
 
         if (usuario is null || !usuario.Ativo || !await userManager.CheckPasswordAsync(usuario, request.Senha))

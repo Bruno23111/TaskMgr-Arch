@@ -14,11 +14,13 @@ public sealed class AtualizarProjetoCommandHandler(IProjetoRepository projetos, 
     public async Task<ProjetoDto> Handle(AtualizarProjetoCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirGestor();
-        request.Versao.ExigirVersaoInformada();
+        RequestValidator.ExigirVersaoInformada(request.Versao);
+        var nome = RequestValidator.ExigirTexto(request.Nome, "nome", 100);
+        var descricao = RequestValidator.ValidarTextoOpcional(request.Descricao, "descricao", 255);
         var projeto = await projetos.ObterPorIdAsync(request.ProjetoId, cancellationToken)
             ?? throw new RecursoNaoEncontradoException("Projeto");
-        projeto.Versao.ExigirVersao(request.Versao);
-        projeto.AtualizarDetalhes(request.Nome, request.Descricao);
+        RequestValidator.ExigirVersaoAtual(projeto.Versao, request.Versao);
+        projeto.AtualizarDetalhes(nome, descricao);
         await unidadeDeTrabalho.SalvarAlteracoesAsync(cancellationToken);
         return projeto.ParaDto();
     }

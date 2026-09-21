@@ -47,9 +47,10 @@ public sealed class StatusService(TaskManagerMvcDbContext dbContext)
         StatusCreateRequest request,
         CancellationToken cancellationToken = default)
     {
-        var codigo = request.Codigo.Trim().ToUpperInvariant();
-        var nome = request.Nome.Trim();
-        var categoria = ParseCategoria(request.Categoria);
+        var codigo = RequestValidation.RequiredText(request.Codigo, "codigo", 20).ToUpperInvariant();
+        var nome = RequestValidation.RequiredText(request.Nome, "nome", 60);
+        var categoria = ParseCategoria(
+            RequestValidation.RequiredText(request.Categoria, "categoria", 20));
         ValidateText(codigo, nome);
 
         if (await dbContext.Statuses.AnyAsync(status => status.Codigo == codigo, cancellationToken))
@@ -74,10 +75,10 @@ public sealed class StatusService(TaskManagerMvcDbContext dbContext)
         StatusUpdateRequest request,
         CancellationToken cancellationToken = default)
     {
+        RequestValidation.Version(request.Versao);
+        var nome = RequestValidation.RequiredText(request.Nome, "nome", 60);
         var status = await FindAsync(statusId, cancellationToken);
         EnsureVersion(status, request.Versao);
-
-        var nome = request.Nome.Trim();
         ValidateText(status.Codigo, nome);
         status.Nome = nome;
         dbContext.Entry(status).State = EntityState.Modified;
@@ -132,7 +133,7 @@ public sealed class StatusService(TaskManagerMvcDbContext dbContext)
         }
     }
 
-    private static CategoriaStatus ParseCategoria(string categoria) => categoria.Trim().ToUpperInvariant() switch
+    private static CategoriaStatus ParseCategoria(string categoria) => categoria.ToUpperInvariant() switch
     {
         "PENDENTE" => CategoriaStatus.Pendente,
         "EM_ANDAMENTO" => CategoriaStatus.EmAndamento,

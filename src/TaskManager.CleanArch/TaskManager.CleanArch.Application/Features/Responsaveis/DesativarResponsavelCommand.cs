@@ -19,7 +19,7 @@ public sealed class DesativarResponsavelCommandHandler(
     public Task<ResponsavelContaDto?> Handle(DesativarResponsavelCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirGestor();
-        request.Versao.ExigirVersaoInformada();
+        RequestValidator.ExigirVersaoInformada(request.Versao);
 
         return unidadeDeTrabalho.ExecutarEmTransacaoSerializavelAsync(async token =>
         {
@@ -34,7 +34,7 @@ public sealed class DesativarResponsavelCommandHandler(
                 return null;
             }
 
-            responsavel.Versao.ExigirVersao(request.Versao);
+            RequestValidator.ExigirVersaoAtual(responsavel.Versao, request.Versao);
             if (responsavel.UsuarioId == usuarioAtual.UsuarioId)
             {
                 throw new DomainRuleViolationException(

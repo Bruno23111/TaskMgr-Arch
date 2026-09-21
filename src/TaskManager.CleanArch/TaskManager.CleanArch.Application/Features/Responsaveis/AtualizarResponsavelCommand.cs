@@ -23,12 +23,10 @@ public sealed class AtualizarResponsavelCommandHandler(
     public Task<ResponsavelContaDto?> Handle(AtualizarResponsavelCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirGestor();
-        request.Versao.ExigirVersaoInformada();
+        RequestValidator.ExigirVersaoInformada(request.Versao);
         PapeisSistema.Validar(request.Papel);
-        if (string.IsNullOrWhiteSpace(request.Nome))
-        {
-            throw new ArgumentException("O nome é obrigatório.", nameof(request.Nome));
-        }
+        var nome = RequestValidator.ExigirTexto(request.Nome, "nome", 100);
+        var email = RequestValidator.ExigirEmail(request.Email);
 
         return unidadeDeTrabalho.ExecutarEmTransacaoSerializavelAsync(async token =>
         {
@@ -38,7 +36,7 @@ public sealed class AtualizarResponsavelCommandHandler(
                 return null;
             }
 
-            responsavel.Versao.ExigirVersao(request.Versao);
+            RequestValidator.ExigirVersaoAtual(responsavel.Versao, request.Versao);
             var conta = await contas.ObterContaAsync(responsavel.UsuarioId, token)
                 ?? throw new InvalidOperationException("Conta de autenticação não encontrada.");
 
@@ -52,11 +50,11 @@ public sealed class AtualizarResponsavelCommandHandler(
                     "O último gestor ativo não pode ser rebaixado.");
             }
 
-            responsavel.AtualizarNome(request.Nome.Trim());
-            await contas.AtualizarContaAsync(responsavel.UsuarioId, request.Email, request.Papel, token);
+            responsavel.AtualizarNome(nome);
+            await contas.AtualizarContaAsync(responsavel.UsuarioId, email, request.Papel, token);
             await unidadeDeTrabalho.SalvarAlteracoesAsync(token);
 
-            return responsavel.ParaDto(conta with { Email = request.Email.Trim(), Papeis = [request.Papel] });
+            return responsavel.ParaDto(conta with { Email = email, Papeis = [request.Papel] });
         }, cancellationToken);
     }
 }

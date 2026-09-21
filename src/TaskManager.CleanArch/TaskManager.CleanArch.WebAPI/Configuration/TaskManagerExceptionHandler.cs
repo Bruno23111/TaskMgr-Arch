@@ -50,7 +50,7 @@ public sealed class TaskManagerExceptionHandler(
     {
         "ACESSO_NEGADO" => StatusCodes.Status403Forbidden,
         "RECURSO_NAO_ENCONTRADO" => StatusCodes.Status404NotFound,
-        "CREDENCIAIS_INVALIDAS" => StatusCodes.Status401Unauthorized,
+        "NAO_AUTENTICADO" => StatusCodes.Status401Unauthorized,
         _ => StatusCodes.Status409Conflict
     };
 }

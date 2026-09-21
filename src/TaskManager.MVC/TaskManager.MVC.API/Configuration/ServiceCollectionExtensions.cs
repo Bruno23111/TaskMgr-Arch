@@ -33,6 +33,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<StatusService>();
         services.AddScoped<ProjectService>();
         services.AddScoped<TaskService>();
+        services.AddScoped<AccountService>();
         services.AddHttpContextAccessor();
         services.AddScoped<CurrentUser>();
 

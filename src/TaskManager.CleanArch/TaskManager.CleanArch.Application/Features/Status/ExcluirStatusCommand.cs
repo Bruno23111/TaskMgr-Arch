@@ -16,10 +16,10 @@ public sealed class ExcluirStatusCommandHandler(
     public async Task Handle(ExcluirStatusCommand request, CancellationToken cancellationToken)
     {
         usuarioAtual.ExigirGestor();
-        request.Versao.ExigirVersaoInformada();
+        RequestValidator.ExigirVersaoInformada(request.Versao);
         var statusTarefa = await status.ObterPorIdAsync(request.StatusId, cancellationToken)
             ?? throw new RecursoNaoEncontradoException("Status");
-        statusTarefa.Versao.ExigirVersao(request.Versao);
+        RequestValidator.ExigirVersaoAtual(statusTarefa.Versao, request.Versao);
         statusTarefa.GarantirPodeSerExcluido(await tarefas.PossuiTarefasParaStatusAsync(statusTarefa.Id, cancellationToken));
         status.Remover(statusTarefa);
         await unidadeDeTrabalho.SalvarAlteracoesAsync(cancellationToken);
