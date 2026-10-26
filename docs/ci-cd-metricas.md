@@ -25,7 +25,7 @@ O repositório privado usa a franquia do plano GitHub Free: 2.000 minutos mensai
 
 O workflow `.github/workflows/backup-azure.yml` copia todas as branches e tags do GitHub para o repositório Azure Repos `TaskMgr-Arch` após pushes e em uma verificação diária. As cópias ficam em `github/<nome-da-branch>` e `github/<nome-da-tag>` no Azure. A branch padrão do repositório Azure é `github/develop`, para mostrar a cópia atual ao abrir o repositório. O workflow não apaga refs antigas nem usa force push; se uma cópia divergir, ele falha e exige reconciliação explícita. As branches históricas `develop` e `main` do Azure permanecem preservadas.
 
-Para autenticar o backup, configure no repositório GitHub o secret de Actions `AZURE_REPOS_BACKUP_PAT` com um PAT da organização `bruno23111399`, escopo **Code (read and write)**, limitado a essa organização. O token não deve ser gravado no repositório. Após criar ou renovar o secret, execute **Backup no Azure Repos** manualmente na aba **Actions** e confira a branch `github/develop` no Azure Repos. Renove o PAT antes de vencer.
+O backup usa o secret de Actions `AZURE_REPOS_BACKUP_PAT`, configurado em 26/10/2026 com um PAT da organização `bruno23111399` e escopo **Code (read and write)**. O token não é gravado no repositório. Após renovar o PAT e atualizar o secret, execute **Backup no Azure Repos** manualmente na aba **Actions** e confira a branch `github/develop` no Azure Repos. Renove o PAT antes de vencer.
 
 ## Artefato `taskmgr-metrics`
 
