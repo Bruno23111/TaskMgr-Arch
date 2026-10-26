@@ -1,0 +1,118 @@
+name: CI e métricas
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-metrics:
+    name: Build, testes e métricas
+    runs-on: ubuntu-24.04
+    env:
+      DOTNET_NOLOGO: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+      BUILD_BUILDID: ${{ github.run_id }}
+      BUILD_SOURCEVERSION: ${{ github.sha }}
+      BUILD_SOURCEBRANCH: ${{ github.ref }}
+      AGENT_OS: Linux
+      AGENT_OSARCHITECTURE: X64
+    steps:
+      - name: Obter código e histórico Git completo
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: false
+
+      - name: Instalar .NET SDK 10.0.401
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.401
+
+      - name: Instalar Python 3.13
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Restaurar e compilar as duas arquiteturas
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet restore src/TaskManager.MVC/TaskManager.MVC.sln
+          dotnet restore src/TaskManager.CleanArch/TaskManager.CleanArch.sln
+          dotnet build src/TaskManager.MVC/TaskManager.MVC.sln --configuration Release --no-restore
+          dotnet build src/TaskManager.CleanArch/TaskManager.CleanArch.sln --configuration Release --no-restore
+
+      - name: Executar testes e coletar cobertura
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/test-results
+          search_roots=(src)
+          [ -d tests ] && search_roots+=(tests)
+          mapfile -t test_projects < <(find "${search_roots[@]}" -type f -name '*Tests.csproj' | sort)
+          if [ "${#test_projects[@]}" -eq 0 ]; then
+            echo '::warning::Ainda não há projetos de teste.'
+            exit 0
+          fi
+          test_exit=0
+          for project in "${test_projects[@]}"; do
+            name="$(basename "$project" .csproj)"
+            dotnet test "$project" --configuration Release \
+              --logger "trx;LogFileName=${name}.trx" \
+              --results-directory artifacts/test-results \
+              --collect 'XPlat Code Coverage' || test_exit=$?
+          done
+          exit "$test_exit"
+
+      - name: Publicar resultados de testes
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: taskmgr-test-results
+          path: artifacts/test-results
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Gerar métricas C# e histórico Git
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check lizard==1.17.10
+          python scripts/analyze_csharp_metrics.py \
+            --source MVC=src/TaskManager.MVC \
+            --source CLEAN_ARCH=src/TaskManager.CleanArch \
+            --test-source MVC=tests/TaskManager.MVC \
+            --test-source CLEAN_ARCH=tests/TaskManager.CleanArch \
+            --output artifacts/metrics \
+            --repository "$GITHUB_WORKSPACE"
+
+      - name: Publicar APIs
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet publish src/TaskManager.MVC/TaskManager.MVC.API/TaskManager.MVC.API.csproj \
+            --configuration Release --no-restore --output artifacts/publish/mvc
+          dotnet publish src/TaskManager.CleanArch/TaskManager.CleanArch.WebAPI/TaskManager.CleanArch.WebAPI.csproj \
+            --configuration Release --no-restore --output artifacts/publish/clean-architecture
+
+      - name: Salvar métricas
+        uses: actions/upload-artifact@v7
+        with:
+          name: taskmgr-metrics
+          path: artifacts/metrics
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Salvar APIs compiladas
+        uses: actions/upload-artifact@v7
+        with:
+          name: taskmgr-apis
+          path: artifacts/publish
+          if-no-files-found: error
+          retention-days: 30

@@ -2,14 +2,14 @@
 
 Repositório central do Trabalho de Conclusão de Curso (TCC) focado na análise comparativa prática entre a **Clean Architecture** e o padrão **MVC**.
 
-O projeto consiste no desenvolvimento de um sistema gerenciador de tarefas (Task Manager) com operações de CRUD e regras de negócio complexas. O objetivo é mensurar, através de automação em CI/CD e coleta de dados via Azure DevOps, a complexidade ciclomática, manutenibilidade e a fricção gerada pelo desenvolvimento assistido por Inteligência Artificial (IA) em diferentes padrões arquiteturais.
+O projeto consiste no desenvolvimento de um sistema gerenciador de tarefas (Task Manager) com operações de CRUD e regras de negócio complexas. O objetivo é mensurar, através de automação em CI/CD no GitHub Actions e gestão de trabalho no Azure Boards, a complexidade ciclomática, manutenibilidade e a fricção gerada pelo desenvolvimento assistido por Inteligência Artificial (IA) em diferentes padrões arquiteturais.
 
 ## Tecnologias Utilizadas
 * **Backend:** .NET 10 (C#)
 * **Frontend:** React (SPA)
 * **Banco de Dados:** PostgreSQL
 * **Infraestrutura:** Docker e Docker Compose
-* **Gestão e CI/CD:** Azure DevOps e Python (Radon)
+* **Gestão e CI/CD:** Azure Boards, GitHub Actions e Python (Lizard)
 
 ## Estrutura do Repositório
 * `/docs`: Documentações adicionais e scripts analíticos.

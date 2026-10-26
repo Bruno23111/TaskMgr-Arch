@@ -1,19 +1,4 @@
-trigger:
-  branches:
-    include:
-      - develop
-      - main
-  paths:
-    include:
-      - src/**
-      - tests/**
-      - docs/openapi/**
-      - docs/requisitos-funcionais.md
-      - scripts/**
-      - docker-compose.yml
-      - .env.example
-      - global.json
-      - azure-pipelines.yml
+trigger: none
 
 pool:
   vmImage: ubuntu-24.04

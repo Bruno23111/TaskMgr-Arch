@@ -1,30 +1,25 @@
 # CI/CD e coleta de métricas
 
-O pipeline definido em `azure-pipelines.yml` é a referência única de integração contínua para as duas implementações. O gatilho CI executa após alterações nas branches `develop` e `main` que afetem código, contrato OpenAPI, requisitos funcionais, scripts, infraestrutura ou a configuração do pipeline. Em Azure Repos, a validação de pull requests é acionada pelas branch policies de `develop` e `main`.
+O workflow `.github/workflows/ci.yml` executa a integração contínua das duas implementações. Ele roda em todos os pushes e pull requests direcionados a `develop` e `main` e também pode ser iniciado manualmente pela aba **Actions** do GitHub. O repositório GitHub passa a ser a origem dos pushes e pull requests que precisam de validação automática.
 
-O ambiente de coleta está fixado em Ubuntu 24.04 e .NET SDK 10.0.401. O arquivo `global.json` impede seleção silenciosa de outro SDK, e o checkout com `fetchDepth: 0` disponibiliza o histórico alcançável completo para a coleta Git.
+O workflow seleciona Ubuntu 24.04, .NET SDK 10.0.401 e Python 3.13 em um runner hospedado pelo GitHub. O arquivo `global.json` impede seleção silenciosa de outro SDK, e o checkout com `fetch-depth: 0` disponibiliza o histórico alcançável completo para a coleta Git. O computador local pode ficar desligado durante o CI.
 
 ## O que o pipeline executa
 
 1. Obtém o código com histórico Git completo, instala o SDK .NET 10.0.401 e compila as soluções MVC e Clean Architecture em modo `Release`.
-2. Procura projetos `*Tests.csproj` em `src/` e `tests/`. Quando existirem, restaura e executa todos os testes, publica TRX e cobertura Cobertura e bloqueia o pipeline se algum teste falhar. Enquanto a User Story #78 não adicionar os projetos, a etapa emite um aviso explícito e não inventa cobertura.
+2. Procura projetos `*Tests.csproj` em `src/` e `tests/`. Quando existirem, restaura e executa todos os testes, salva TRX e cobertura Cobertura e falha se algum teste falhar. Se não houver projetos, emite um aviso explícito e não inventa cobertura.
 3. Instala Lizard 1.17.10 e executa `scripts/analyze_csharp_metrics.py` nas duas árvores de código C#.
-4. Publica os artefatos `taskmgr-metrics` e `taskmgr-apis` no Azure Pipelines.
+4. Salva os artefatos `taskmgr-test-results`, `taskmgr-metrics` e `taskmgr-apis` no GitHub Actions por 30 dias.
 
 Não há implantação automática nesta primeira versão: o repositório ainda não contém Dockerfiles das APIs nem ambiente de destino. A publicação das APIs compiladas é a etapa de entrega contínua; uma etapa de deploy será adicionada quando esses elementos existirem.
 
-## Evidências no Azure Blob Storage
+## Evidências no GitHub Actions
 
-O estágio `PublishArtifactsToBlob` baixa os artifacts `taskmgr-metrics` e `taskmgr-apis` da execução atual e os envia ao container privado `pipeline-artifacts` da Storage Account `taskmgrartifacts2026`.
+Os artefatos ficam disponíveis na página de cada execução do workflow, na aba **Actions**. O envio ao Azure Blob Storage não faz parte deste workflow porque a assinatura Azure de estudante está inativa. Para preservar as evidências do TCC além dos 30 dias de retenção configurados, baixe os artefatos dos builds usados na análise.
 
-O caminho segue a convenção abaixo, permitindo localizar uma evidência sem depender da retenção do Azure Pipelines:
+O repositório privado usa a franquia do plano GitHub Free: 2.000 minutos mensais de runners padrão hospedados e 500 MB de armazenamento de artefatos. Monitore o consumo em **Settings → Billing and licensing** para permanecer na franquia.
 
-```text
-<branch>/build-<Build.BuildId>/metrics/...
-<branch>/build-<Build.BuildId>/apis/...
-```
-
-Cada blob recebe os metadados `buildid`, `branch` e `commit`. Pull Requests não executam esse estágio e não recebem acesso à Service Connection. A conexão `sc-taskmgr-arch-blob` usa Workload Identity Federation e possui somente o papel `Storage Blob Data Contributor` na Storage Account.
+`metrics-summary.json` registra o ID da execução e o commit. O histórico Git e os CSVs ficam no artefato `taskmgr-metrics`.
 
 ## Artefato `taskmgr-metrics`
 
@@ -44,23 +39,23 @@ As arquiteturas são identificadas como `MVC` e `CLEAN_ARCH`. Os totais em `arch
 - **NLOC:** linhas físicas não vazias após remover comentários.
 - **Complexidade ciclomática:** soma das complexidades dos métodos, calculada por Lizard para C#.
 - **Índice de manutenibilidade:** variante normalizada de 0 a 100, sem bônus por comentários: `max(0, (171 - 5.2 ln(V) - 0.23 CC - 16.2 ln(LOC)) × 100 / 171)`. O volume de Halstead `V` é uma aproximação léxica reproduzível, registrada no CSV. O índice só pode ser comparado entre builds deste pipeline; não deve ser comparado diretamente a valores gerados por outra ferramenta ou fórmula.
-- **Cobertura:** cobertura Cobertura gerada pelos testes, quando projetos de teste forem adicionados.
+- **Cobertura:** cobertura Cobertura gerada pelos projetos de teste encontrados.
 - **Tempo de implementação:** derivado posteriormente de `git-history.csv` e dos vínculos de commits/PRs com as work items do Azure DevOps. O timestamp de um commit isolado não representa, por si, esforço humano.
 
 Radon não é utilizado para análise do backend: ele é um analisador de código Python e não mede C# de forma válida. Lizard é usado para a complexidade C#; a fórmula de manutenibilidade e suas limitações são explícitas para manter a análise auditável.
 
-## Gatilhos, policies e segurança
+## Gatilhos, proteção de branches e migração
 
-- Pushes em `develop` e `main` usam o gatilho `trigger` do YAML.
-- Pull requests são validados pelas branch policies do Azure Repos. O bloco YAML `pr` não é usado porque esse recurso não controla PRs hospedados no Azure Repos.
-- As policies de build são obrigatórias; build ou teste com falha impede o merge.
-- O Variable Group `taskmgr-github-mirror` é declarado somente no estágio `MirrorToGitHub`. Esse estágio não executa em pull requests e só recebe o token depois de uma validação bem-sucedida em `develop` ou `main`.
-- O espelhamento usa a credencial apenas durante o push e remove o arquivo temporário ao encerrar a etapa.
+- Pushes e pull requests em `develop` e `main` usam os gatilhos do workflow GitHub.
+- No GitHub Free com repositório privado, a proteção de branches com checks obrigatórios não está disponível. Confira o resultado do job **Build, testes e métricas** antes de cada merge. Se o plano ou a visibilidade do repositório mudar, configure esse job como check obrigatório.
+- O `trigger` do `azure-pipelines.yml` foi desabilitado. Remova também as antigas build policies de `develop` e `main` no Azure Repos: essas policies continuam disparando o pipeline independentemente do gatilho YAML.
+- O workflow usa somente a permissão `contents: read` do `GITHUB_TOKEN`. Não precisa do antigo Variable Group `taskmgr-github-mirror` nem de um token para espelhar branches.
+- Work items do Azure Boards podem continuar sendo usados; os commits e pull requests validados passam a estar no GitHub. Revise os vínculos usados na análise de tempo de implementação.
 
 ## Como reproduzir a coleta
 
 1. Use um commit em `develop` ou `main` no qual MVC e Clean Architecture implementem o mesmo conjunto de requisitos.
-2. Confirme no log o agente Ubuntu 24.04, o SDK 10.0.401 e a versão 1.17.10 do Lizard.
+2. Confirme no log o runner Ubuntu 24.04, o SDK 10.0.401, Python 3.13 e Lizard 1.17.10.
 3. Confirme que build e testes aplicáveis foram aprovados.
 4. Baixe `taskmgr-metrics` e registre o ID do build e o commit presentes em `metrics-summary.json`.
 5. Preserve os CSVs brutos junto com a análise do TCC; não combine resultados produzidos com versões diferentes do ambiente.
@@ -70,4 +65,4 @@ Radon não é utilizado para análise do backend: ele é um analisador de códig
 - Concluir a User Story #78 com testes unitários, integração, contrato e concorrência para MVC e Clean Architecture, cobrindo CA01–CA34 de `docs/requisitos-funcionais.md`.
 - Adicionar Dockerfiles das APIs e uma etapa de deploy para ambiente de homologação quando esse ambiente existir.
 - Adicionar benchmarks de carga com dataset, perfil de carga, aquecimento e infraestrutura controlados. Essa etapa deve produzir um artefato separado de latência e throughput; não deve compartilhar recursos com o build de métricas estáticas.
-- Definir uma consulta no Azure DevOps que relacione work items, commits e PRs para análise de tempo de implementação.
+- Definir uma consulta que relacione work items do Azure Boards aos commits e PRs do GitHub para análise de tempo de implementação.
