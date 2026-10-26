@@ -2,14 +2,15 @@
 
 O workflow `.github/workflows/ci.yml` executa a integração contínua das duas implementações. Ele roda em todos os pushes e pull requests direcionados a `develop` e `main` e também pode ser iniciado manualmente pela aba **Actions** do GitHub. O repositório GitHub passa a ser a origem dos pushes e pull requests que precisam de validação automática.
 
-O workflow seleciona Ubuntu 24.04, .NET SDK 10.0.401 e Python 3.13 em um runner hospedado pelo GitHub. O arquivo `global.json` impede seleção silenciosa de outro SDK, e o checkout com `fetch-depth: 0` disponibiliza o histórico alcançável completo para a coleta Git. O computador local pode ficar desligado durante o CI.
+O workflow seleciona Ubuntu 24.04, .NET SDK 10.0.401, Python 3.13 e Node.js 24 em um runner hospedado pelo GitHub. O arquivo `global.json` impede seleção silenciosa de outro SDK, e o checkout com `fetch-depth: 0` disponibiliza o histórico alcançável completo para a coleta Git. O computador local pode ficar desligado durante o CI.
 
 ## O que o pipeline executa
 
 1. Obtém o código com histórico Git completo, instala o SDK .NET 10.0.401 e compila as soluções MVC e Clean Architecture em modo `Release`.
 2. Procura projetos `*Tests.csproj` em `src/` e `tests/`. Quando existirem, restaura e executa todos os testes, salva TRX e cobertura Cobertura e falha se algum teste falhar. Se não houver projetos, emite um aviso explícito e não inventa cobertura.
 3. Instala Lizard 1.17.10 e executa `scripts/analyze_csharp_metrics.py` nas duas árvores de código C#.
-4. Salva os artefatos `taskmgr-test-results`, `taskmgr-metrics` e `taskmgr-apis` no GitHub Actions por 30 dias.
+4. Instala as dependências da Web com `npm ci`, executa lint e testes Vitest e compila a SPA React.
+5. Salva os artefatos `taskmgr-test-results`, `taskmgr-metrics`, `taskmgr-apis` e `taskmgr-web` no GitHub Actions por 30 dias.
 
 Não há implantação automática nesta primeira versão: o repositório ainda não contém Dockerfiles das APIs nem ambiente de destino. A publicação das APIs compiladas é a etapa de entrega contínua; uma etapa de deploy será adicionada quando esses elementos existirem.
 
