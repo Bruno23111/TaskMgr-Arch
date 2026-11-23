@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using System.Text.Json;
 
 namespace TaskManager.MVC.API.Configuration;
@@ -14,7 +15,7 @@ public sealed class ConcurrencyExceptionHandler : IExceptionHandler
         Exception exception,
         CancellationToken cancellationToken)
     {
-        if (exception is not DbUpdateConcurrencyException)
+        if (exception is not DbUpdateConcurrencyException && !IsSerializationConflict(exception))
         {
             return false;
         }
@@ -34,5 +35,22 @@ public sealed class ConcurrencyExceptionHandler : IExceptionHandler
         await JsonSerializer.SerializeAsync(httpContext.Response.Body, details, JsonOptions, cancellationToken);
 
         return true;
+    }
+
+    // Falhas transitórias chegam embrulhadas pelo provedor (InvalidOperationException → DbUpdateException → PostgresException).
+    private static bool IsSerializationConflict(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is PostgresException
+                {
+                    SqlState: PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected
+                })
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
