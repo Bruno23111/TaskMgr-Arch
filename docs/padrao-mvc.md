@@ -226,7 +226,11 @@ Validação mínima antes de concluir uma alteração:
 dotnet build src/TaskManager.MVC/TaskManager.MVC.API/TaskManager.MVC.API.csproj
 ```
 
-Quando os projetos de teste referenciados por `TaskManager.MVC.sln` estiverem presentes no workspace, execute também `dotnet test src/TaskManager.MVC/TaskManager.MVC.sln`. Atualmente, a solução referencia projetos em `tests/TaskManager.MVC` que não fazem parte desta cópia do repositório.
+Execute também os testes unitários da solução, que não dependem de banco:
+
+```powershell
+dotnet test src/TaskManager.MVC/TaskManager.MVC.sln
+```
 
 ## 12. Checklist antes de concluir uma alteração
 
