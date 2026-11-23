@@ -18,14 +18,12 @@ public sealed class UnidadeDeTrabalho(TaskManagerCleanArchDbContext context) : I
         {
             throw new ConflitoDeConcorrenciaException();
         }
-        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        catch (Exception exception) when (ObterPostgresException(exception)?.SqlState == PostgresErrorCodes.UniqueViolation)
         {
             throw new ValorDuplicadoException("Já existe um registro com esse valor único.");
         }
-        catch (DbUpdateException exception) when (exception.InnerException is PostgresException
-        {
-            SqlState: PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected
-        })
+        catch (Exception exception) when (ObterPostgresException(exception)?.SqlState is
+            PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected)
         {
             throw new ConflitoDeConcorrenciaException();
         }
@@ -73,6 +71,15 @@ public sealed class UnidadeDeTrabalho(TaskManagerCleanArchDbContext context) : I
         }
     }
 
-    private static PostgresException? ObterPostgresException(Exception exception) =>
-        exception as PostgresException ?? exception.InnerException as PostgresException;
+    // Falhas transitórias chegam embrulhadas pelo provedor (InvalidOperationException → DbUpdateException → PostgresException).
+    private static PostgresException? ObterPostgresException(Exception exception)
+    {
+        for (var atual = exception; atual is not null; atual = atual.InnerException)
+        {
+            if (atual is PostgresException postgresException)
+                return postgresException;
+        }
+
+        return null;
+    }
 }
