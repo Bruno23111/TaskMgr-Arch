@@ -10,9 +10,11 @@ public sealed class StatusRepository(TaskManagerCleanArchDbContext context) : IS
     public Task<StatusTarefa?> ObterPorIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         context.Statuses.SingleOrDefaultAsync(status => status.Id == id, cancellationToken);
 
+    // O seed garante um único status protegido por categoria; por isso não há critério de desempate.
     public Task<StatusTarefa?> ObterPendenteInicialAsync(CancellationToken cancellationToken = default) =>
-        context.Statuses.OrderBy(status => status.Codigo)
-            .FirstOrDefaultAsync(status => status.Categoria == CategoriaStatus.Pendente, cancellationToken);
+        context.Statuses.FirstOrDefaultAsync(
+            status => status.Protegido && status.Categoria == CategoriaStatus.Pendente,
+            cancellationToken);
 
     public async Task<IReadOnlyList<StatusTarefa>> ListarAsync(CancellationToken cancellationToken = default) =>
         await context.Statuses.AsNoTracking().OrderBy(status => status.Codigo).ToArrayAsync(cancellationToken);
